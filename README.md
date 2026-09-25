@@ -2,6 +2,14 @@
 
 WPF 데스크톱 업무 목록과 로컬 HTTP API를 연결한 예제입니다. 목록을 검색하고 상태로 거른 뒤, 항목의 상태와 메모를 수정해 저장하거나 취소할 수 있습니다.
 
+## Windows 화면
+
+![메모를 수정하고 저장한 화면](docs/screenshots/saved.png)
+
+API 연결이 끊기면 입력 내용을 유지한 채 저장 실패를 표시합니다.
+
+![API 중단 후 저장 실패 메시지를 표시한 화면](docs/screenshots/save-error.png)
+
 ## 구성
 
 - `src/WpfDemo.Client`: .NET Framework 4.8 WPF 앱. XAML 바인딩과 ViewModel이 검색, 선택, 입력 검증, 저장 상태를 처리합니다.
