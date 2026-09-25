@@ -1,0 +1,53 @@
+name: Windows build and UI check
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  windows:
+    runs-on: windows-2025-vs2026
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+      - uses: microsoft/setup-msbuild@v2
+
+      - name: ViewModel tests
+        run: dotnet run --project tests/WpfDemo.Tests/WpfDemo.Tests.csproj -c Release
+
+      - name: Build .NET Framework 4.8 WPF client
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force artifacts | Out-Null
+          msbuild src/WpfDemo.Client/WpfDemo.Client.csproj /p:Configuration=Release /p:Platform=AnyCPU /m 2>&1 | Tee-Object artifacts/wpf-build.log
+          if ($LASTEXITCODE -ne 0) {
+            Get-Content artifacts/wpf-build.log | Select-String '(?i)error (CS|MC|MSB|XDG|XAML)[0-9]+' | Select-Object -First 10 | ForEach-Object { Write-Output "::error::$($_.Line)" }
+            exit 1
+          }
+
+      - name: Publish local API for Windows x64
+        run: dotnet publish src/WpfDemo.Api/WpfDemo.Api.csproj -c Release -r win-x64 --self-contained true -o artifacts/api
+
+      - name: Assemble runnable demo
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force artifacts/client | Out-Null
+          Copy-Item src/WpfDemo.Client/bin/Release/* artifacts/client/ -Recurse
+
+      - name: Install Windows UI automation
+        shell: pwsh
+        run: winget install --id Microsoft.WinAppCLI --silent --accept-package-agreements --accept-source-agreements --disable-interactivity
+
+      - name: Run API and WPF UI flow
+        shell: pwsh
+        run: ./scripts/windows-ui-smoke.ps1
+
+      - name: Upload screenshots and runnable files
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: wpf-demo-windows
+          path: artifacts/
+          if-no-files-found: warn

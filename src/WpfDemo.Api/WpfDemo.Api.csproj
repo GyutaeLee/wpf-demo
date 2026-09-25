@@ -1,0 +1,11 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>disable</Nullable>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Include="../Shared/WorkItem.cs" Link="Shared/WorkItem.cs" />
+    <Compile Include="../Shared/WorkStatus.cs" Link="Shared/WorkStatus.cs" />
+  </ItemGroup>
+</Project>
