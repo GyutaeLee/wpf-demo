@@ -67,6 +67,11 @@ static async Task ValidationAndCancel()
     var vm = new WorklistViewModel(new FakeApi());
     await vm.LoadAsync();
     vm.SelectedItem = vm.VisibleItems[0];
+    vm.EditedStatus = "unknown";
+    Check(!vm.CanSave && vm.ValidationMessage.Contains("상태"), "unknown status validation");
+    vm.EditedStatus = WorklistViewModel.Waiting;
+    vm.EditedNote = new string('x', 200);
+    Check(vm.CanSave && vm.ValidationMessage == "", "200-character note is allowed");
     vm.EditedNote = "   ";
     Check(vm.IsDirty && !vm.CanSave && vm.ValidationMessage != "", "whitespace validation");
     vm.EditedNote = new string('x', 201);
