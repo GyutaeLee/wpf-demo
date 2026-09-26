@@ -14,8 +14,8 @@ jobs:
           dotnet-version: 10.0.x
       - uses: microsoft/setup-msbuild@v2
 
-      - name: ViewModel tests
-        run: dotnet run --project tests/WpfDemo.Tests/WpfDemo.Tests.csproj -c Release
+      - name: ViewModel and API tests
+        run: dotnet test tests/WpfDemo.Tests/WpfDemo.Tests.csproj -c Release --logger "console;verbosity=normal"
 
       - name: Build .NET Framework 4.8 WPF client
         shell: pwsh

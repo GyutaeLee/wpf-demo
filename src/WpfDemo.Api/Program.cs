@@ -59,3 +59,5 @@ public sealed class UpdateItemRequest
     public string Status { get; set; }
     public string Note { get; set; }
 }
+
+public partial class Program { }
