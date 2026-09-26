@@ -30,6 +30,6 @@ API를 실행한 뒤 `wpf-demo.sln`을 열고 `WpfDemo.Client`를 시작 프로�
 dotnet test tests/WpfDemo.Tests/WpfDemo.Tests.csproj -c Release
 ```
 
-MSTest로 ViewModel 상태와 API 요청·응답을 검사합니다. 현재 변경은 macOS에서 16개 테스트가 통과했으며 Windows CI는 확인 전입니다. [공개 코드의 Windows CI](https://github.com/GyutaeLee/wpf-demo/actions/runs/36147599201)에서는 WPF 빌드와 조회·편집·저장, API 중단 후 재시도를 확인했습니다.
+MSTest로 ViewModel 상태와 API 요청·응답을 검사합니다. macOS와 [Windows CI](https://github.com/GyutaeLee/wpf-demo/actions/runs/36214253479)에서 16개 테스트가 통과했습니다. 같은 Windows 실행에서 WPF 빌드와 조회·편집·저장, API 중단 후 재시도를 확인했습니다.
 
 Mac 테스트와 UTM 실행 절차, 아직 확인하지 못한 배율·접근성 항목은 [테스트 방법](docs/testing.md)에 정리했습니다.

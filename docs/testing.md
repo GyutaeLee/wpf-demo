@@ -21,10 +21,10 @@ ViewModel 테스트는 WPF 앱과 같은 소스를 .NET 10에서 컴파일합니
 
 | 확인 시점·대상 | 결과 |
 | --- | --- |
-| 2026-09-26, MSTest 전환·추가 시나리오·저장 알림 수정의 로컬 작업본 | macOS 26.6 ARM64 / .NET SDK 10.0.101. ViewModel 9개와 API 7개, 총 16개 통과. 현 변경의 Windows CI는 실행 전. |
-| 공개 기준 코드 `b71cf95` | [Windows CI 성공](https://github.com/GyutaeLee/wpf-demo/actions/runs/36147599201). 기존 콘솔 테스트, WPF 빌드, 조회·편집·저장과 API 중단·재시도 확인. |
+| 2026-09-26, MSTest 전환·추가 시나리오·저장 알림 수정 | macOS 26.6 ARM64 / .NET SDK 10.0.101. ViewModel 9개와 API 7개, 총 16개 통과. |
+| 코드 기준 `64e98ed` | [Windows CI 성공](https://github.com/GyutaeLee/wpf-demo/actions/runs/36214253479). MSTest 16개, WPF 빌드, 조회·편집·저장과 API 중단·재시도, 재시도 후 서버 값 확인. |
 
-새 변경의 Windows CI가 통과하면 대상 커밋과 실행 링크를 추가합니다. 위 두 결과는 서로 다른 코드 상태를 확인한 기록입니다.
+위 결과는 이번 테스트·클라이언트·API 변경을 확인한 기록입니다. 문서와 캡처 화면은 해당 Windows 실행 결과로 갱신했습니다.
 
 ## macOS에서 API 실행
 
@@ -50,7 +50,7 @@ API 터미널에서 `Ctrl+C`로 종료합니다. 재시작하면 항목은 초�
 
 [워크플로](../.github/workflows/windows.yml)는 테스트 → WPF 빌드 → x64 API 게시 → API·WPF 실행 순서로 구성했습니다. [UI 스크립트](../scripts/windows-ui-smoke.ps1)는 저장·재시도 후 서버 값, 조회 오류·재시도, 일부 Tab 이동·Enter 저장, 작은 창·최대화에서 일부 컨트롤의 창 내부 위치를 검사합니다. 실행 파일, 스크린샷과 로그는 `wpf-demo-windows` 산출물에 담습니다.
 
-MSTest 전환과 재시도 후 서버 값 확인 등 이번 변경의 Windows 결과는 아직 없습니다. 작은 창 검사로 모든 문구의 잘림을 확인할 수 없으며, DPI 기록도 배율 100%·150%에서 직접 사용한 결과는 아닙니다.
+현재 워크플로의 테스트·빌드·UI 흐름은 위 실행에서 통과했습니다. 작은 창 검사로 모든 문구의 잘림을 확인할 수 없으며, DPI 기록도 배율 100%·150%에서 직접 사용한 결과는 아닙니다.
 
 ## Mac에서 WPF 화면 확인하기
 

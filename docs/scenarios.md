@@ -14,23 +14,23 @@ ViewModel은 [IWorkItemApi](../src/Shared/IWorkItemApi.cs)를 호출합니다. �
 
 `TaskCompletionSource`로 응답 시점을 정한 [ViewModel 테스트](../tests/WpfDemo.Tests/WorklistViewModelTests.cs)에서 선택과 초안 유지, 추가 조회 차단, 수정 요청이 한 번만 호출되는지 확인했습니다. 응답이 도착하면 다시 선택·편집할 수 있습니다. 여러 항목의 동시 편집 대신 현재 입력을 보호하는 쪽을 선택했습니다.
 
-이 검사는 한 ViewModel 안의 동작을 확인합니다. 두 앱의 동시 수정이나 저장 응답만 유실되는 상황은 다루지 않습니다. 입력 컨트롤의 실제 비활성화 여부도 이번 Windows CI에서 확인해야 합니다.
+이 검사는 한 ViewModel 안의 동작을 확인합니다. 두 앱의 동시 수정이나 저장 응답만 유실되는 상황은 다루지 않습니다. 응답 대기 중 입력 컨트롤의 실제 비활성화는 별도 화면 확인이 필요합니다.
 
 ## 저장 실패 후 다시 시도할 때
 
 API에 연결하지 못해도 상태와 메모 초안은 남겨 둡니다. 사용자는 API를 다시 실행한 뒤 같은 화면에서 저장할 수 있습니다. 조회 실패는 빈 검색 결과와 구분해 표시합니다.
 
-[ViewModel 테스트](../tests/WpfDemo.Tests/WorklistViewModelTests.cs)는 저장 실패 후 입력 유지·재시도와 조회 실패·재시도를 확인합니다. [Windows 스크립트](../scripts/windows-ui-smoke.ps1)는 API 프로세스를 직접 중지·재시작해 화면 오류와 재시도를 확인합니다. 이번 변경에는 재시도 후 GET으로 서버 메모까지 확인하는 검사를 추가했고, 이 추가 검사는 아직 Windows에서 실행하지 않았습니다.
+[ViewModel 테스트](../tests/WpfDemo.Tests/WorklistViewModelTests.cs)는 저장 실패 후 입력 유지·재시도와 조회 실패·재시도를 확인합니다. [Windows 스크립트](../scripts/windows-ui-smoke.ps1)는 API 프로세스를 직접 중지·재시작해 화면 오류와 재시도를 확인합니다. 재시도 후 GET으로 서버 메모까지 확인하는 검사도 [Windows CI](https://github.com/GyutaeLee/wpf-demo/actions/runs/36214253479)에서 통과했습니다.
 
 ![API 중단 후 저장 실패 화면](screenshots/save-error.png)
 
-화면은 기존 Windows CI에서 캡처했습니다. 초안은 앱 종료 후에는 남지 않으며, API도 재시작하면 초기 데이터로 돌아갑니다.
+화면은 같은 [Windows CI](https://github.com/GyutaeLee/wpf-demo/actions/runs/36214253479)에서 캡처했습니다. 초안은 앱 종료 후에는 남지 않으며, API도 재시작하면 초기 데이터로 돌아갑니다.
 
 ## 저장한 항목이 필터에서 빠질 때
 
 ‘대기’ 필터에서 항목을 ‘진행 중’으로 저장하면 해당 항목을 목록에서 빼고 선택을 해제합니다. 저장 결과는 계속 표시합니다.
 
-추가한 테스트에서 선택 해제와 함께 저장 알림도 지워지는 동작을 확인했습니다. [SaveAsync](../src/Shared/WorklistViewModel.cs)에서 필터 갱신 뒤 알림을 설정하도록 순서를 바꿨습니다. 수정 후 빈 목록·선택 해제·편집 완료 상태·알림 유지 검사가 통과했습니다. 이번 변경의 실제 WPF 표시는 Windows CI에서 확인 전입니다.
+추가한 테스트에서 선택 해제와 함께 저장 알림도 지워지는 동작을 확인했습니다. [SaveAsync](../src/Shared/WorklistViewModel.cs)에서 필터 갱신 뒤 알림을 설정하도록 순서를 바꿨습니다. 수정 후 빈 목록·선택 해제·편집 완료 상태·알림 유지 검사가 통과했습니다. 필터에서 빠진 항목의 실제 화면 표시는 별도 확인 전입니다.
 
 ## API에 잘못된 값을 보낼 때
 
