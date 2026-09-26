@@ -215,7 +215,6 @@ namespace WpfDemo
                 _editedNote = item.Note;
                 OnPropertyChanged(nameof(EditedStatus));
                 OnPropertyChanged(nameof(EditedNote));
-                Notice = "저장되었습니다.";
             }
             catch (Exception)
             {
@@ -225,7 +224,11 @@ namespace WpfDemo
             {
                 IsSaving = false;
                 UpdateEditingState();
-                if (!HasSaveError) ApplyFilter();
+                if (!HasSaveError)
+                {
+                    ApplyFilter();
+                    Notice = "저장되었습니다.";
+                }
             }
         }
 

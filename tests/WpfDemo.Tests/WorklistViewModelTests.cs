@@ -154,6 +154,27 @@ public sealed class WorklistViewModelTests
     }
 
     [TestMethod]
+    public async Task SavingSelectedItemOutOfStatusFilterClearsSelectionAndKeepsNotice()
+    {
+        var api = new FakeApi();
+        var vm = new WorklistViewModel(api);
+        await vm.LoadAsync();
+        vm.StatusFilter = WorklistViewModel.Waiting;
+        vm.SelectedItem = vm.VisibleItems[0];
+        vm.EditedStatus = WorklistViewModel.InProgress;
+
+        await vm.SaveAsync();
+
+        Assert.AreEqual(0, vm.VisibleItems.Count);
+        Assert.AreEqual(0, vm.VisibleItems.Count(item => item.Status == WorklistViewModel.Waiting));
+        Assert.IsNull(vm.SelectedItem);
+        Assert.IsFalse(vm.HasSelection);
+        Assert.IsFalse(vm.IsDirty);
+        Assert.IsTrue(vm.HasNotice);
+        Assert.AreEqual("저장되었습니다.", vm.Notice);
+    }
+
+    [TestMethod]
     public async Task SaveFailureKeepsDraftAndCanRetry()
     {
         var api = new FakeApi { FailSave = true };
