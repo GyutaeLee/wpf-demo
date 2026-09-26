@@ -45,15 +45,23 @@ function Assert-VisibleInWindow {
 
 function Start-Api {
     $process = Start-Process -FilePath "$PWD/artifacts/api/WpfDemo.Api.exe" -PassThru -WindowStyle Hidden
-    for ($attempt = 0; $attempt -lt 30; $attempt++) {
-        try {
-            $null = Invoke-RestMethod 'http://127.0.0.1:5187/api/work-items' -TimeoutSec 2
-            return $process
-        } catch {
-            Start-Sleep -Milliseconds 500
+    try {
+        for ($attempt = 0; $attempt -lt 30; $attempt++) {
+            $process.Refresh()
+            if ($process.HasExited) { throw 'Local API process exited before becoming ready.' }
+            try {
+                $null = Invoke-RestMethod 'http://127.0.0.1:5187/api/work-items' -TimeoutSec 2
+                return $process
+            } catch {
+                Start-Sleep -Milliseconds 500
+            }
         }
+        throw 'Local API did not start.'
+    } catch {
+        $process.Refresh()
+        if (-not $process.HasExited) { Stop-Process -Id $process.Id -Force }
+        throw
     }
-    throw 'Local API did not start.'
 }
 
 New-Item -ItemType Directory -Force artifacts/screenshots | Out-Null
@@ -91,6 +99,8 @@ try {
     $api = Start-Api
     Run-WinApp @('ui', 'invoke', 'SaveButton', '-a', $target)
     Run-WinApp @('ui', 'wait-for', 'SaveNotice', '-a', $target, '--value', '저장되었습니다.', '-t', '10000')
+    $retried = Invoke-RestMethod 'http://127.0.0.1:5187/api/work-items'
+    if (($retried | Where-Object id -eq 1001).note -ne '중단 후 다시 저장') { throw 'API did not persist the retried memo.' }
     Run-WinApp @('ui', 'screenshot', '-a', $target, '-o', 'artifacts/screenshots/04-retried.png')
 
     Stop-Process -Id $api.Id -Force
