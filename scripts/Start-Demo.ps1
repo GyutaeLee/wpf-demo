@@ -166,7 +166,7 @@ function Complete-Recording {
     if ($Recorder.ExitCode -ne 0 -or -not (Test-Path $Path) -or (Get-Item $Path).Length -lt 10000) {
         throw "WinAppCLI did not produce a complete video: $Path"
     }
-    $framesDirectory = "$Path.frames"
+    $framesDirectory = [System.IO.Path]::ChangeExtension($Path, '.frames')
     $manifestPath = Join-Path $framesDirectory 'manifest.json'
     $frameLogPath = Join-Path $framesDirectory 'frames.ndjson'
     if (-not (Test-Path $manifestPath) -or -not (Test-Path $frameLogPath)) {
@@ -260,8 +260,8 @@ function Test-EscapeCancelsDraft {
     Invoke-Ui -Verb 'set-value' -Selector 'OperationNote' -Value 'discard this draft' -ProcessId $Client.Id
     Invoke-Ui -Verb 'focus' -Selector 'OperationNote' -ProcessId $Client.Id
     Invoke-WinApp -Arguments @('ui', 'send-keys', 'escape', '-a', [string]$Client.Id, '--via', 'send-input')
-    $value = & winapp ui get-property OperationNote -a ([string]$Client.Id) --property Value --json | ConvertFrom-Json
-    if ($LASTEXITCODE -ne 0 -or $value.element.value -ne '') { throw 'Escape did not cancel the unsent note draft.' }
+    Invoke-WinApp -Arguments @('ui', 'wait-for', 'OperationNote', '-a', [string]$Client.Id,
+        '--property', 'Value', '--value', '', '-t', '3000')
 }
 
 function Test-TabOrder {
