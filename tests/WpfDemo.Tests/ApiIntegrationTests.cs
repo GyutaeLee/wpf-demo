@@ -421,6 +421,7 @@ public sealed class ApiIntegrationTests
             }
             finally
             {
+                SqliteConnection.ClearAllPools();
                 Environment.SetEnvironmentVariable("WPFDEMO_SERVER_DATA_DIR", _previousDataDirectory);
                 if (_ownsDirectory && Directory.Exists(_directory)) Directory.Delete(_directory, recursive: true);
             }
