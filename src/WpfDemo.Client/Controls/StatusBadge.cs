@@ -13,7 +13,7 @@ namespace WpfDemo.Controls
 
         public static readonly DependencyProperty StatusProperty = DependencyProperty.Register(
             nameof(Status), typeof(string), typeof(StatusBadge),
-            new FrameworkPropertyMetadata(WorkStatus.Waiting));
+            new FrameworkPropertyMetadata(EquipmentStates.Available));
 
         public string Status
         {

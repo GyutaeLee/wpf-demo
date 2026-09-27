@@ -5,7 +5,9 @@
     <Nullable>disable</Nullable>
   </PropertyGroup>
   <ItemGroup>
-    <Compile Include="../Shared/WorkItem.cs" Link="Shared/WorkItem.cs" />
-    <Compile Include="../Shared/WorkStatus.cs" Link="Shared/WorkStatus.cs" />
+    <Compile Include="../Shared/LendingContracts.cs" Link="Shared/LendingContracts.cs" />
+  </ItemGroup>
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Data.Sqlite" Version="10.0.12" />
   </ItemGroup>
 </Project>

@@ -2,19 +2,21 @@
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
     <Application.Resources>
-        <SolidColorBrush x:Key="Ink" Color="#17233B" />
-        <SolidColorBrush x:Key="MutedInk" Color="#617089" />
-        <SolidColorBrush x:Key="Accent" Color="#1767C2" />
+        <BooleanToVisibilityConverter x:Key="BooleanToVisibility" />
+        <SolidColorBrush x:Key="Canvas" Color="{DynamicResource {x:Static SystemColors.WindowColorKey}}" />
+        <SolidColorBrush x:Key="Ink" Color="{DynamicResource {x:Static SystemColors.WindowTextColorKey}}" />
+        <SolidColorBrush x:Key="MutedInk" Color="{DynamicResource {x:Static SystemColors.GrayTextColorKey}}" />
+        <SolidColorBrush x:Key="Accent" Color="{DynamicResource {x:Static SystemColors.HighlightColorKey}}" />
         <Style TargetType="TextBox">
             <Setter Property="Padding" Value="10,8" />
-            <Setter Property="BorderBrush" Value="#CAD4E1" />
+            <Setter Property="BorderBrush" Value="{DynamicResource {x:Static SystemColors.WindowFrameBrushKey}}" />
             <Setter Property="BorderThickness" Value="1" />
             <Setter Property="FontSize" Value="14" />
             <Setter Property="VerticalContentAlignment" Value="Center" />
         </Style>
         <Style TargetType="ComboBox">
             <Setter Property="Padding" Value="8,6" />
-            <Setter Property="BorderBrush" Value="#CAD4E1" />
+            <Setter Property="BorderBrush" Value="{DynamicResource {x:Static SystemColors.WindowFrameBrushKey}}" />
             <Setter Property="FontSize" Value="14" />
         </Style>
         <Style TargetType="Button">

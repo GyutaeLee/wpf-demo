@@ -59,13 +59,15 @@
       <DependentUpon>MainWindow.xaml</DependentUpon>
     </Compile>
     <Compile Include="Controls\StatusBadge.cs" />
-    <Compile Include="HttpWorkItemApi.cs" />
+    <Compile Include="Controls\LiveRegionTextBlock.cs" />
+    <Compile Include="HttpLendingApi.cs" />
+    <Compile Include="PendingOperationStore.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
-    <Compile Include="..\Shared\IWorkItemApi.cs"><Link>Shared\IWorkItemApi.cs</Link></Compile>
+    <Compile Include="..\Shared\ILendingApi.cs"><Link>Shared\ILendingApi.cs</Link></Compile>
+    <Compile Include="..\Shared\LendingContracts.cs"><Link>Shared\LendingContracts.cs</Link></Compile>
+    <Compile Include="..\Shared\LendingViewModel.cs"><Link>Shared\LendingViewModel.cs</Link></Compile>
+    <Compile Include="..\Shared\PendingOperation.cs"><Link>Shared\PendingOperation.cs</Link></Compile>
     <Compile Include="..\Shared\RelayCommand.cs"><Link>Shared\RelayCommand.cs</Link></Compile>
-    <Compile Include="..\Shared\WorkItem.cs"><Link>Shared\WorkItem.cs</Link></Compile>
-    <Compile Include="..\Shared\WorkStatus.cs"><Link>Shared\WorkStatus.cs</Link></Compile>
-    <Compile Include="..\Shared\WorklistViewModel.cs"><Link>Shared\WorklistViewModel.cs</Link></Compile>
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
 </Project>

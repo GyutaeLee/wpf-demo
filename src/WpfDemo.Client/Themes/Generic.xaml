@@ -5,23 +5,24 @@
         <Setter Property="Template">
             <Setter.Value>
                 <ControlTemplate TargetType="{x:Type controls:StatusBadge}">
-                    <Border x:Name="BadgeBorder" Background="#E9EEF5" CornerRadius="10"
+                    <Border x:Name="BadgeBorder" Background="{DynamicResource {x:Static SystemColors.WindowBrushKey}}" CornerRadius="10"
                             Padding="9,4" HorizontalAlignment="Left">
                         <TextBlock x:Name="BadgeText" Text="{TemplateBinding Status}"
-                                   FontSize="12" FontWeight="SemiBold" Foreground="#43536D" />
+                                   FontSize="12" FontWeight="SemiBold"
+                                   Foreground="{DynamicResource {x:Static SystemColors.WindowTextBrushKey}}" />
                     </Border>
                     <ControlTemplate.Triggers>
-                        <Trigger Property="Status" Value="대기">
-                            <Setter TargetName="BadgeBorder" Property="Background" Value="#EDF1F6" />
-                            <Setter TargetName="BadgeText" Property="Foreground" Value="#4B5D77" />
+                        <Trigger Property="Status" Value="사용 가능">
+                            <Setter TargetName="BadgeBorder" Property="Background" Value="{DynamicResource {x:Static SystemColors.WindowBrushKey}}" />
+                            <Setter TargetName="BadgeText" Property="Foreground" Value="{DynamicResource {x:Static SystemColors.WindowTextBrushKey}}" />
                         </Trigger>
-                        <Trigger Property="Status" Value="진행 중">
-                            <Setter TargetName="BadgeBorder" Property="Background" Value="#E6F0FF" />
-                            <Setter TargetName="BadgeText" Property="Foreground" Value="#175EAF" />
+                        <Trigger Property="Status" Value="대여 중">
+                            <Setter TargetName="BadgeBorder" Property="Background" Value="{DynamicResource {x:Static SystemColors.HighlightBrushKey}}" />
+                            <Setter TargetName="BadgeText" Property="Foreground" Value="{DynamicResource {x:Static SystemColors.HighlightTextBrushKey}}" />
                         </Trigger>
-                        <Trigger Property="Status" Value="완료">
-                            <Setter TargetName="BadgeBorder" Property="Background" Value="#E5F5EC" />
-                            <Setter TargetName="BadgeText" Property="Foreground" Value="#207548" />
+                        <Trigger Property="Status" Value="점검 중">
+                            <Setter TargetName="BadgeBorder" Property="Background" Value="{DynamicResource {x:Static SystemColors.InfoBrushKey}}" />
+                            <Setter TargetName="BadgeText" Property="Foreground" Value="{DynamicResource {x:Static SystemColors.InfoTextBrushKey}}" />
                         </Trigger>
                     </ControlTemplate.Triggers>
                 </ControlTemplate>

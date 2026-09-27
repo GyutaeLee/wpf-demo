@@ -15,7 +15,14 @@ jobs:
       - uses: microsoft/setup-msbuild@v2
 
       - name: ViewModel and API tests
-        run: dotnet test tests/WpfDemo.Tests/WpfDemo.Tests.csproj -c Release --logger "console;verbosity=normal"
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force artifacts/tests | Out-Null
+          dotnet test tests/WpfDemo.Tests/WpfDemo.Tests.csproj -c Release `
+            --logger "console;verbosity=normal" `
+            --logger "trx;LogFileName=wpf-demo-tests.trx" `
+            --results-directory artifacts/tests
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
       - name: Build .NET Framework 4.8 WPF client
         shell: pwsh
@@ -35,16 +42,20 @@ jobs:
         run: |
           New-Item -ItemType Directory -Force artifacts/client | Out-Null
           Copy-Item src/WpfDemo.Client/bin/Release/* artifacts/client/ -Recurse
+          New-Item -ItemType Directory -Force artifacts/scripts | Out-Null
+          Copy-Item scripts/Start-Demo.ps1 artifacts/scripts/
+          Compress-Archive -Path artifacts/api, artifacts/client, artifacts/scripts `
+            -DestinationPath artifacts/wpf-demo-windows-demo.zip -Force
 
       - name: Install Windows UI automation
         shell: pwsh
-        run: winget install --id Microsoft.WinAppCLI --silent --accept-package-agreements --accept-source-agreements --disable-interactivity
+        run: winget install --id Microsoft.WinAppCLI --version 0.7.0 --silent --accept-package-agreements --accept-source-agreements --disable-interactivity
 
-      - name: Run API and WPF UI flow
+      - name: Run five API and WPF scenarios
         shell: pwsh
-        run: ./scripts/windows-ui-smoke.ps1
+        run: ./scripts/Start-Demo.ps1 -Scenario All
 
-      - name: Upload screenshots and runnable files
+      - name: Upload screenshots, recordings, test results, and runnable files
         if: always()
         uses: actions/upload-artifact@v4
         with:
