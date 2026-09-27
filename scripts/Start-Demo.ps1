@@ -190,7 +190,8 @@ function Get-EquipmentState {
 }
 
 function Get-EquipmentHistory {
-    return @(Invoke-RestMethod "$apiAddress/api/equipment/$equipmentId/history" -TimeoutSec 5)
+    $history = Invoke-RestMethod "$apiAddress/api/equipment/$equipmentId/history" -TimeoutSec 5
+    return $history
 }
 
 function Assert-OperationCounts {
