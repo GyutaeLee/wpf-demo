@@ -273,6 +273,17 @@ function Test-TabOrder {
         '--property', 'HasKeyboardFocus', '--value', 'True', '-t', '3000')
 }
 
+function Test-StatusDropdown {
+    param([System.Diagnostics.Process]$Client)
+    Invoke-Ui -Verb 'focus' -Selector 'StatusFilter' -ProcessId $Client.Id
+    Invoke-WinApp -Arguments @('ui', 'send-keys', 'alt+down down enter', '-a', [string]$Client.Id, '--via', 'send-input')
+    Invoke-WinApp -Arguments @('ui', 'wait-for', 'EquipmentCount', '-a', [string]$Client.Id,
+        '--value', '3개', '-t', '3000')
+    Invoke-WinApp -Arguments @('ui', 'send-keys', 'alt+down home enter', '-a', [string]$Client.Id, '--via', 'send-input')
+    Invoke-WinApp -Arguments @('ui', 'wait-for', 'EquipmentCount', '-a', [string]$Client.Id,
+        '--value', '5개', '-t', '3000')
+}
+
 function Send-BorrowWithEnter {
     param([System.Diagnostics.Process]$Client, [string]$Note)
     Select-Equipment -Client $Client
@@ -352,17 +363,19 @@ function Invoke-Basic {
     try {
         $api = Start-Api $serverData $false (Join-Path $run 'logs')
         $client = Start-Client $clientData 'A'
-        $recorder = Start-Recording $client.Id (Join-Path $run 'videos\basic.mp4')
         Test-TabOrder $client
+        Test-StatusDropdown $client
         Test-EscapeCancelsDraft $client
-        Send-BorrowWithEnter $client 'basic demo loan'
+        $recorder = Start-Recording $client.Id (Join-Path $run 'videos\basic.mp4')
+        Start-Sleep -Seconds 1
+        Send-BorrowWithEnter $client '회의용 대여'
         Wait-OperationNotice $client '대여가 완료되었습니다.'
-        Start-Sleep -Seconds 2
+        Start-Sleep -Seconds 3
         $borrowed = Assert-OperationCounts 1 0 '대여 중'
         Save-Screenshot $client (Join-Path $run 'screenshots\01-borrowed.png')
         Send-ReturnWithEnter $client
         Wait-OperationNotice $client '반납이 완료되었습니다.'
-        Start-Sleep -Seconds 2
+        Start-Sleep -Seconds 3
         $returned = Assert-OperationCounts 1 1 '사용 가능'
         Save-Screenshot $client (Join-Path $run 'screenshots\02-returned.png')
         Assert-WindowLayouts $client $run

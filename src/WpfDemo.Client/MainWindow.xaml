@@ -2,18 +2,23 @@
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:controls="clr-namespace:WpfDemo.Controls"
+        xmlns:local="clr-namespace:WpfDemo"
         Title="wpf-demo — 장비 대여" Width="1040" Height="720"
         MinWidth="820" MinHeight="520" Background="{StaticResource Canvas}"
-        FontFamily="Malgun Gothic, Segoe UI" Foreground="{StaticResource Ink}"
+        FontFamily="Malgun Gothic, Segoe UI" FontSize="14" Foreground="{DynamicResource Ink}"
+        TextOptions.TextFormattingMode="Display" TextOptions.TextRenderingMode="Grayscale"
         UseLayoutRounding="True" SnapsToDevicePixels="True"
         WindowStartupLocation="CenterScreen">
+    <Window.Resources>
+        <local:UtcTimestampConverter x:Key="UtcTimestamp" />
+    </Window.Resources>
     <Window.InputBindings>
         <KeyBinding Key="Escape" Command="{Binding CancelCommand}" />
     </Window.InputBindings>
-    <Grid Margin="16,14">
+    <Grid Margin="20,16">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto" />
-            <RowDefinition Height="14" />
+            <RowDefinition Height="16" />
             <RowDefinition Height="*" />
             <RowDefinition Height="Auto" />
         </Grid.RowDefinitions>
@@ -24,25 +29,24 @@
                 <ColumnDefinition Width="Auto" />
             </Grid.ColumnDefinitions>
             <StackPanel>
-                <TextBlock Text="EQUIPMENT / DESKTOP" FontSize="11" FontWeight="Bold" Foreground="{StaticResource Accent}" />
-                <TextBlock Text="장비 대여·반납" FontSize="25" FontWeight="SemiBold" Margin="0,4,0,1" />
-                <TextBlock Text="장비 상태와 대여 이력을 확인합니다." FontSize="13" Foreground="{StaticResource MutedInk}" />
+                <TextBlock Text="장비 대여·반납" FontSize="26" FontWeight="SemiBold" Margin="0,0,0,4" />
+                <TextBlock Text="장비를 선택해 대여하거나 반납하고, 기록을 확인합니다." Foreground="{DynamicResource MutedInk}" />
             </StackPanel>
-            <Border Grid.Column="1" Background="{DynamicResource {x:Static SystemColors.InfoBrushKey}}" CornerRadius="5" Padding="10,7"
+            <Border Grid.Column="1" Background="{DynamicResource Surface}" BorderBrush="{DynamicResource Stroke}" BorderThickness="1" CornerRadius="5" Padding="12,8"
                     VerticalAlignment="Top" Margin="12,0,0,0">
-                <TextBlock Text="로컬 API" FontSize="11" Foreground="{DynamicResource {x:Static SystemColors.InfoTextBrushKey}}" />
+                <TextBlock Text="가상 데이터" FontSize="13" Foreground="{DynamicResource MutedInk}" />
             </Border>
         </Grid>
 
         <Grid Grid.Row="2">
             <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="5*" MinWidth="290" />
-                <ColumnDefinition Width="14" />
-                <ColumnDefinition Width="6*" MinWidth="420" />
+                <ColumnDefinition Width="5*" MinWidth="320" />
+                <ColumnDefinition Width="16" />
+                <ColumnDefinition Width="6*" MinWidth="400" />
             </Grid.ColumnDefinitions>
 
-            <Border Grid.Column="0" Background="{DynamicResource {x:Static SystemColors.WindowBrushKey}}"
-                    BorderBrush="{DynamicResource {x:Static SystemColors.WindowFrameBrushKey}}" BorderThickness="1" CornerRadius="8" Padding="16">
+            <Border Grid.Column="0" Background="{DynamicResource Surface}"
+                    BorderBrush="{DynamicResource Stroke}" BorderThickness="1" CornerRadius="8" Padding="16">
                 <Grid>
                     <Grid.RowDefinitions>
                         <RowDefinition Height="Auto" />
@@ -52,7 +56,12 @@
                     </Grid.RowDefinitions>
                     <Grid>
                         <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
-                        <TextBlock Text="장비 목록" FontSize="17" FontWeight="SemiBold" VerticalAlignment="Center" />
+                        <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                            <TextBlock Text="장비 목록" FontSize="18" FontWeight="SemiBold" />
+                            <TextBlock Text="{Binding VisibleItems.Count, StringFormat={}{0}개}" FontSize="13"
+                                       Foreground="{DynamicResource MutedInk}" Margin="10,0,0,0" VerticalAlignment="Center"
+                                       AutomationProperties.AutomationId="EquipmentCount" />
+                        </StackPanel>
                         <Button Grid.Column="1" Content="새로고침" Command="{Binding RefreshCommand}"
                                 AutomationProperties.AutomationId="ReloadButton" />
                     </Grid>
@@ -60,17 +69,17 @@
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="*" />
                             <ColumnDefinition Width="8" />
-                            <ColumnDefinition Width="112" />
+                            <ColumnDefinition Width="132" />
                         </Grid.ColumnDefinitions>
                         <StackPanel>
-                            <TextBlock Text="검색" FontSize="12" Foreground="{StaticResource MutedInk}" Margin="0,0,0,5" />
+                            <TextBlock Text="검색" Foreground="{DynamicResource Ink}" Margin="0,0,0,6" />
                             <TextBox Text="{Binding SearchText, UpdateSourceTrigger=PropertyChanged}"
                                      IsEnabled="{Binding CanNavigate}"
                                      AutomationProperties.Name="장비 코드, 이름 또는 분류 검색"
                                      AutomationProperties.AutomationId="SearchBox" />
                         </StackPanel>
                         <StackPanel Grid.Column="2">
-                            <TextBlock Text="상태" FontSize="12" Foreground="{StaticResource MutedInk}" Margin="0,0,0,5" />
+                            <TextBlock Text="상태" Foreground="{DynamicResource Ink}" Margin="0,0,0,6" />
                             <ComboBox ItemsSource="{Binding StatusFilters}"
                                       SelectedItem="{Binding StatusFilter, Mode=TwoWay}"
                                       IsEnabled="{Binding CanNavigate}"
@@ -79,38 +88,56 @@
                     </Grid>
                     <Border Grid.Row="2" Background="{DynamicResource {x:Static SystemColors.InfoBrushKey}}" CornerRadius="4" Padding="8,5" Margin="0,8,0,0"
                             Visibility="{Binding HasStaleResults, Converter={StaticResource BooleanToVisibility}}">
-                        <TextBlock Text="이전 조회 결과입니다. 연결을 복구한 뒤 새로고침해 주세요." FontSize="11"
+                        <TextBlock Text="이전 조회 결과입니다. 연결을 복구한 뒤 새로고침해 주세요." FontSize="13" TextWrapping="Wrap"
                                    Foreground="{DynamicResource {x:Static SystemColors.InfoTextBrushKey}}"
                                    AutomationProperties.AutomationId="StaleResultsNotice" />
                     </Border>
                     <Grid Grid.Row="3">
                         <ListBox ItemsSource="{Binding VisibleItems}" SelectedItem="{Binding SelectedItem, Mode=TwoWay}"
                                  IsEnabled="{Binding CanNavigate}" BorderThickness="0" Background="Transparent"
-                                 ScrollViewer.VerticalScrollBarVisibility="Auto"
+                                 ScrollViewer.VerticalScrollBarVisibility="Auto" ScrollViewer.HorizontalScrollBarVisibility="Disabled" Margin="0,12,0,0"
                                  AutomationProperties.Name="장비 목록"
                                  AutomationProperties.AutomationId="EquipmentList">
                             <ListBox.ItemContainerStyle>
                                 <Style TargetType="ListBoxItem">
-                                    <Setter Property="Padding" Value="0" />
-                                    <Setter Property="Margin" Value="0,0,0,7" />
+                                    <Setter Property="Padding" Value="12,10" />
+                                    <Setter Property="Margin" Value="0,0,0,8" />
                                     <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+                                    <Setter Property="Foreground" Value="{DynamicResource Ink}" />
+                                    <Setter Property="FocusVisualStyle" Value="{StaticResource KeyboardFocus}" />
                                     <Setter Property="AutomationProperties.AutomationId" Value="{Binding Id, StringFormat=Equipment{0}}" />
+                                    <Setter Property="Template">
+                                        <Setter.Value>
+                                            <ControlTemplate TargetType="ListBoxItem">
+                                                <Border x:Name="ItemBorder" Background="{DynamicResource Surface}" BorderBrush="{DynamicResource Stroke}"
+                                                        BorderThickness="1" CornerRadius="5" Padding="{TemplateBinding Padding}">
+                                                    <ContentPresenter HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}" />
+                                                </Border>
+                                                <ControlTemplate.Triggers>
+                                                    <Trigger Property="IsMouseOver" Value="True"><Setter TargetName="ItemBorder" Property="BorderBrush" Value="{DynamicResource Accent}" /></Trigger>
+                                                    <Trigger Property="IsSelected" Value="True">
+                                                        <Setter TargetName="ItemBorder" Property="Background" Value="{DynamicResource Accent}" />
+                                                        <Setter TargetName="ItemBorder" Property="BorderBrush" Value="{DynamicResource Accent}" />
+                                                        <Setter Property="Foreground" Value="{DynamicResource AccentText}" />
+                                                    </Trigger>
+                                                </ControlTemplate.Triggers>
+                                            </ControlTemplate>
+                                        </Setter.Value>
+                                    </Setter>
                                 </Style>
                             </ListBox.ItemContainerStyle>
                             <ListBox.ItemTemplate>
                                 <DataTemplate>
-                                    <Border BorderBrush="{DynamicResource {x:Static SystemColors.WindowFrameBrushKey}}" BorderThickness="1" CornerRadius="5" Padding="10,9">
-                                        <Grid>
-                                            <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
-                                            <StackPanel>
-                                                <TextBlock Text="{Binding Name}" FontSize="14" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
-                                                <TextBlock FontSize="11" Foreground="{StaticResource MutedInk}" Margin="0,4,0,0">
-                                                    <Run Text="{Binding Code}" /><Run Text="  ·  " /><Run Text="{Binding Category}" />
-                                                </TextBlock>
-                                            </StackPanel>
-                                            <controls:StatusBadge Grid.Column="1" Status="{Binding Status}" Margin="8,0,0,0" VerticalAlignment="Center" />
-                                        </Grid>
-                                    </Border>
+                                    <Grid>
+                                        <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
+                                        <StackPanel>
+                                            <TextBlock Text="{Binding Name}" FontSize="16" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
+                                            <TextBlock FontSize="13" Margin="0,5,0,0">
+                                                <Run Text="{Binding Code}" /><Run Text="  ·  " /><Run Text="{Binding Category}" />
+                                            </TextBlock>
+                                        </StackPanel>
+                                        <controls:StatusBadge Grid.Column="1" Status="{Binding Status}" Margin="8,0,0,0" VerticalAlignment="Center" />
+                                    </Grid>
                                 </DataTemplate>
                             </ListBox.ItemTemplate>
                             <ListBox.Style>
@@ -133,8 +160,8 @@
                             <StackPanel.Style><Style TargetType="StackPanel"><Setter Property="Visibility" Value="Collapsed" />
                                 <Style.Triggers><DataTrigger Binding="{Binding HasNoResultsLoadError}" Value="True"><Setter Property="Visibility" Value="Visible" /></DataTrigger></Style.Triggers>
                             </Style></StackPanel.Style>
-                            <TextBlock Text="목록을 새로고침하지 못했습니다." FontSize="14" FontWeight="SemiBold" TextWrapping="Wrap" TextAlignment="Center" />
-                            <TextBlock Text="{Binding LoadMessage}" FontSize="12" Foreground="{StaticResource MutedInk}" Margin="0,7,0,12" TextWrapping="Wrap" TextAlignment="Center" />
+                            <TextBlock Text="목록을 새로고침하지 못했습니다." FontSize="16" FontWeight="SemiBold" TextWrapping="Wrap" TextAlignment="Center" />
+                            <TextBlock Text="{Binding LoadMessage}" Foreground="{DynamicResource MutedInk}" Margin="0,8,0,12" TextWrapping="Wrap" TextAlignment="Center" />
                             <Button Content="다시 시도" Command="{Binding RefreshCommand}" HorizontalAlignment="Center" />
                         </StackPanel>
                         <TextBlock Text="조건에 맞는 장비가 없습니다." FontSize="14" Foreground="{StaticResource MutedInk}"
@@ -147,8 +174,8 @@
                 </Grid>
             </Border>
 
-            <Border Grid.Column="2" Background="{DynamicResource {x:Static SystemColors.WindowBrushKey}}"
-                    BorderBrush="{DynamicResource {x:Static SystemColors.WindowFrameBrushKey}}" BorderThickness="1" CornerRadius="8" Padding="18">
+            <Border Grid.Column="2" Background="{DynamicResource Surface}"
+                    BorderBrush="{DynamicResource Stroke}" BorderThickness="1" CornerRadius="8" Padding="18">
                 <Grid>
                     <Grid.RowDefinitions><RowDefinition Height="*" /><RowDefinition Height="Auto" /><RowDefinition Height="Auto" /></Grid.RowDefinitions>
                     <TextBlock Text="왼쪽 목록에서 장비를 선택해 주세요." FontSize="15" Foreground="{StaticResource MutedInk}"
@@ -157,64 +184,96 @@
                             <Style.Triggers><DataTrigger Binding="{Binding HasSelection}" Value="True"><Setter Property="Visibility" Value="Collapsed" /></DataTrigger></Style.Triggers>
                         </Style></TextBlock.Style>
                     </TextBlock>
-                    <ScrollViewer Grid.Row="0" VerticalScrollBarVisibility="Auto">
+                    <ScrollViewer Grid.Row="0" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled"
+                                  Padding="0,0,8,0" FocusVisualStyle="{StaticResource KeyboardFocus}">
                         <ScrollViewer.Style><Style TargetType="ScrollViewer"><Setter Property="Visibility" Value="Collapsed" />
                             <Style.Triggers><DataTrigger Binding="{Binding HasSelection}" Value="True"><Setter Property="Visibility" Value="Visible" /></DataTrigger></Style.Triggers>
                         </Style></ScrollViewer.Style>
                         <StackPanel>
-                            <TextBlock Text="장비 상세" FontSize="17" FontWeight="SemiBold" />
-                            <Border Background="{DynamicResource {x:Static SystemColors.ControlBrushKey}}" CornerRadius="5" Padding="13" Margin="0,12,0,0">
+                            <Border BorderBrush="{DynamicResource Stroke}" BorderThickness="0,0,0,1" Padding="0,0,0,12">
                                 <StackPanel>
-                                    <TextBlock Text="{Binding SelectedItem.Name}" FontSize="18" FontWeight="SemiBold" TextWrapping="Wrap" />
-                                    <TextBlock FontSize="12" Foreground="{StaticResource MutedInk}" Margin="0,5,0,9">
+                                    <Grid>
+                                        <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
+                                        <TextBlock Text="{Binding SelectedItem.Name}" FontSize="22" FontWeight="SemiBold" TextWrapping="Wrap" VerticalAlignment="Center" />
+                                        <controls:StatusBadge Grid.Column="1" Status="{Binding SelectedItem.Status}" Margin="10,0,0,0"
+                                                              AutomationProperties.Name="장비 상태" VerticalAlignment="Center" />
+                                    </Grid>
+                                    <TextBlock Foreground="{DynamicResource MutedInk}" Margin="0,6,0,0">
                                         <Run Text="{Binding SelectedItem.Code}" /><Run Text="  ·  " /><Run Text="{Binding SelectedItem.Category}" />
                                     </TextBlock>
-                                    <controls:StatusBadge Status="{Binding SelectedItem.Status}" AutomationProperties.Name="장비 상태" />
-                                    <StackPanel Visibility="{Binding HasActiveLoan, Converter={StaticResource BooleanToVisibility}}" Margin="0,10,0,0">
-                                        <TextBlock FontSize="12"><Run Text="대여자: " /><Run Text="{Binding SelectedItem.ActiveLoan.BorrowerName}" /></TextBlock>
-                                        <TextBlock FontSize="11" Foreground="{StaticResource MutedInk}" Margin="0,3,0,0">
-                                            <Run Text="대여 시각(UTC): " /><Run Text="{Binding SelectedItem.ActiveLoan.BorrowedAtUtc}" />
+                                    <StackPanel Visibility="{Binding HasActiveLoan, Converter={StaticResource BooleanToVisibility}}" Margin="0,8,0,0">
+                                        <TextBlock><Run Text="현재 대여자: " /><Run Text="{Binding SelectedItem.ActiveLoan.BorrowerName}" /></TextBlock>
+                                        <TextBlock FontSize="13" Foreground="{DynamicResource MutedInk}" Margin="0,4,0,0" TextWrapping="Wrap">
+                                            <Run Text="대여 시각: " /><Run Text="{Binding SelectedItem.ActiveLoan.BorrowedAtUtc, Converter={StaticResource UtcTimestamp}}" />
                                         </TextBlock>
                                     </StackPanel>
                                 </StackPanel>
                             </Border>
-                            <TextBlock Text="대여자" FontSize="13" FontWeight="SemiBold" Margin="0,15,0,5" />
-                            <ComboBox ItemsSource="{Binding Borrowers}" SelectedItem="{Binding SelectedBorrower, Mode=TwoWay}"
-                                      DisplayMemberPath="DisplayName" IsEnabled="{Binding CanChooseBorrower}"
-                                      AutomationProperties.Name="대여자 선택"
-                                      AutomationProperties.AutomationId="BorrowerSelector" />
-                            <TextBlock Text="메모" FontSize="13" FontWeight="SemiBold" Margin="0,13,0,5" />
-                            <TextBox Text="{Binding DraftNote, UpdateSourceTrigger=PropertyChanged}" IsEnabled="{Binding CanEdit}"
-                                     AutomationProperties.Name="대여 및 반납 메모"
-                                     AutomationProperties.AutomationId="OperationNote" />
-                            <TextBlock Text="선택 입력 · 200자 이내" FontSize="11" Foreground="{StaticResource MutedInk}" Margin="0,4,0,0" />
-                            <TextBlock Text="{Binding ValidationMessage}" Foreground="{DynamicResource {x:Static SystemColors.WindowTextBrushKey}}" FontSize="12" Margin="0,5,0,0">
+                            <Grid Margin="0,16,0,0">
+                                <Grid.ColumnDefinitions><ColumnDefinition Width="2*" /><ColumnDefinition Width="14" /><ColumnDefinition Width="3*" /></Grid.ColumnDefinitions>
+                                <StackPanel>
+                                    <TextBlock Text="대여자 선택" Margin="0,0,0,6" />
+                                    <ComboBox ItemsSource="{Binding Borrowers}" SelectedItem="{Binding SelectedBorrower, Mode=TwoWay}"
+                                              DisplayMemberPath="DisplayName" IsEnabled="{Binding CanChooseBorrower}"
+                                              AutomationProperties.Name="대여자 선택"
+                                              AutomationProperties.AutomationId="BorrowerSelector" />
+                                    <TextBlock Text="대여할 때 선택" FontSize="12" Foreground="{DynamicResource MutedInk}" Margin="0,5,0,0" />
+                                </StackPanel>
+                                <StackPanel Grid.Column="2">
+                                    <TextBlock Text="메모" Margin="0,0,0,6" />
+                                    <TextBox Text="{Binding DraftNote, UpdateSourceTrigger=PropertyChanged}" IsEnabled="{Binding CanEdit}"
+                                             AutomationProperties.Name="대여 및 반납 메모"
+                                             AutomationProperties.AutomationId="OperationNote" />
+                                    <TextBlock Text="선택 입력 · 200자 이내" FontSize="12" Foreground="{DynamicResource MutedInk}" Margin="0,5,0,0" />
+                                </StackPanel>
+                            </Grid>
+                            <TextBlock Text="{Binding ValidationMessage}" Foreground="{DynamicResource Ink}" Margin="0,8,0,0" TextWrapping="Wrap">
                                 <TextBlock.Style><Style TargetType="TextBlock"><Setter Property="Visibility" Value="Visible" />
                                     <Style.Triggers><DataTrigger Binding="{Binding ValidationMessage}" Value=""><Setter Property="Visibility" Value="Collapsed" /></DataTrigger></Style.Triggers>
                                 </Style></TextBlock.Style>
                             </TextBlock>
-                            <Grid Margin="0,17,0,5">
+                            <Grid Margin="0,20,0,8">
                                 <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
-                                <TextBlock Text="대여 이력" FontSize="15" FontWeight="SemiBold" VerticalAlignment="Center" />
-                                <TextBlock Grid.Column="1" Text="불러오는 중…" FontSize="11" Foreground="{StaticResource MutedInk}"
+                                <TextBlock Text="대여 이력" FontSize="16" FontWeight="SemiBold" VerticalAlignment="Center" />
+                                <TextBlock Grid.Column="1" Text="불러오는 중…" FontSize="13" Foreground="{DynamicResource MutedInk}"
                                            Visibility="{Binding IsLoadingHistory, Converter={StaticResource BooleanToVisibility}}" />
                             </Grid>
-                            <TextBlock Text="이력을 불러오지 못했습니다." FontSize="12"
+                            <TextBlock Text="이력을 불러오지 못했습니다."
                                        Foreground="{DynamicResource {x:Static SystemColors.InfoTextBrushKey}}"
                                        Visibility="{Binding HasHistoryError, Converter={StaticResource BooleanToVisibility}}" />
-                            <TextBlock Text="아직 대여 이력이 없습니다." FontSize="12" Foreground="{StaticResource MutedInk}"
+                            <TextBlock Text="아직 대여 이력이 없습니다." Foreground="{DynamicResource MutedInk}"
                                        Visibility="{Binding ShowNoHistoryMessage, Converter={StaticResource BooleanToVisibility}}" />
                             <ItemsControl ItemsSource="{Binding History}" AutomationProperties.AutomationId="HistoryList">
                                 <ItemsControl.ItemTemplate>
                                     <DataTemplate>
-                                        <Border BorderBrush="{DynamicResource {x:Static SystemColors.WindowFrameBrushKey}}" BorderThickness="0,1,0,0" Padding="0,8">
+                                        <Border BorderBrush="{DynamicResource Stroke}" BorderThickness="0,1,0,0" Padding="0,10">
                                             <Grid>
-                                                <Grid.ColumnDefinitions><ColumnDefinition Width="Auto" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions>
-                                                <TextBlock Text="{Binding Kind}" FontWeight="SemiBold" FontSize="12" MinWidth="46" />
+                                                <Grid.ColumnDefinitions><ColumnDefinition Width="52" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions>
+                                                <TextBlock FontWeight="SemiBold" Margin="0,0,12,0">
+                                                    <TextBlock.Style>
+                                                        <Style TargetType="TextBlock">
+                                                            <Setter Property="Text" Value="{Binding Kind}" />
+                                                            <Style.Triggers>
+                                                                <DataTrigger Binding="{Binding Kind}" Value="Borrowed"><Setter Property="Text" Value="대여" /></DataTrigger>
+                                                                <DataTrigger Binding="{Binding Kind}" Value="Returned"><Setter Property="Text" Value="반납" /></DataTrigger>
+                                                            </Style.Triggers>
+                                                        </Style>
+                                                    </TextBlock.Style>
+                                                </TextBlock>
                                                 <StackPanel Grid.Column="1">
-                                                    <TextBlock Text="{Binding BorrowerName}" FontSize="12" />
-                                                    <TextBlock Text="{Binding OccurredAtUtc}" FontSize="10" Foreground="{StaticResource MutedInk}" Margin="0,2,0,0" />
-                                                    <TextBlock Text="{Binding Note}" FontSize="11" TextWrapping="Wrap" Margin="0,2,0,0" />
+                                                    <TextBlock Text="{Binding BorrowerName}" />
+                                                    <TextBlock Text="{Binding OccurredAtUtc, Converter={StaticResource UtcTimestamp}}" FontSize="13"
+                                                               Foreground="{DynamicResource MutedInk}" Margin="0,4,0,0" TextWrapping="Wrap" />
+                                                    <TextBlock Text="{Binding Note}" TextWrapping="Wrap" Margin="0,5,0,0">
+                                                        <TextBlock.Style>
+                                                            <Style TargetType="TextBlock">
+                                                                <Style.Triggers>
+                                                                    <DataTrigger Binding="{Binding Note}" Value=""><Setter Property="Visibility" Value="Collapsed" /></DataTrigger>
+                                                                    <DataTrigger Binding="{Binding Note}" Value="{x:Null}"><Setter Property="Visibility" Value="Collapsed" /></DataTrigger>
+                                                                </Style.Triggers>
+                                                            </Style>
+                                                        </TextBlock.Style>
+                                                    </TextBlock>
                                                 </StackPanel>
                                             </Grid>
                                         </Border>
@@ -227,7 +286,7 @@
                     <Border Grid.Row="1" Background="{DynamicResource {x:Static SystemColors.InfoBrushKey}}" CornerRadius="5" Padding="10" Margin="0,10,0,0"
                             Visibility="{Binding HasPendingOperation, Converter={StaticResource BooleanToVisibility}}">
                         <StackPanel>
-                            <controls:LiveRegionTextBlock Text="{Binding OperationMessage}" FontSize="12"
+                            <controls:LiveRegionTextBlock Text="{Binding OperationMessage}"
                                                           Foreground="{DynamicResource {x:Static SystemColors.InfoTextBrushKey}}" TextWrapping="Wrap"
                                                           AutomationProperties.LiveSetting="Polite"
                                                           AutomationProperties.AutomationId="OperationStatus" />
@@ -238,11 +297,11 @@
                     <Border Grid.Row="1" Background="{DynamicResource {x:Static SystemColors.InfoBrushKey}}" CornerRadius="5" Padding="10" Margin="0,10,0,0"
                             Visibility="{Binding HasRecoveryError, Converter={StaticResource BooleanToVisibility}}">
                         <TextBlock Text="저장된 요청을 읽지 못했습니다. 파일을 보존했으며 새 요청을 보낼 수 없습니다."
-                                   FontSize="12" Foreground="{DynamicResource {x:Static SystemColors.InfoTextBrushKey}}"
+                                   Foreground="{DynamicResource {x:Static SystemColors.InfoTextBrushKey}}"
                                    TextWrapping="Wrap" AutomationProperties.AutomationId="RecoveryError" />
                     </Border>
                     <controls:LiveRegionTextBlock Grid.Row="1" Text="{Binding OperationMessage}"
-                                                   Foreground="{DynamicResource {x:Static SystemColors.InfoTextBrushKey}}" FontSize="12" Margin="0,10,0,0"
+                                                   Foreground="{DynamicResource Ink}" Margin="0,12,0,0"
                                                    TextWrapping="Wrap" AutomationProperties.LiveSetting="Polite"
                                                    AutomationProperties.AutomationId="OperationNotice">
                         <controls:LiveRegionTextBlock.Style><Style TargetType="controls:LiveRegionTextBlock"><Setter Property="Visibility" Value="Visible" />
@@ -257,9 +316,9 @@
                     <StackPanel Grid.Row="2" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,10,0,0">
                         <Button Content="취소" Command="{Binding CancelCommand}" Margin="0,0,7,0"
                                 AutomationProperties.AutomationId="CancelButton" />
-                        <Button Content="대여" Command="{Binding BorrowCommand}" IsDefault="{Binding CanBorrow}"
+                        <Button Content="대여" Command="{Binding BorrowCommand}" IsDefault="{Binding CanBorrow}" Style="{StaticResource PrimaryButton}" MinWidth="80"
                                 AutomationProperties.AutomationId="BorrowButton" />
-                        <Button Content="반납" Command="{Binding ReturnCommand}" IsDefault="{Binding CanReturn}" Margin="7,0,0,0"
+                        <Button Content="반납" Command="{Binding ReturnCommand}" IsDefault="{Binding CanReturn}" Margin="8,0,0,0" Style="{StaticResource PrimaryButton}" MinWidth="80"
                                 AutomationProperties.AutomationId="ReturnButton" />
                     </StackPanel>
                 </Grid>
@@ -267,6 +326,6 @@
         </Grid>
 
         <TextBlock Grid.Row="3" Text="모든 장비와 대여 기록은 시연용 가상 데이터입니다."
-                   FontSize="11" Foreground="{StaticResource MutedInk}" Margin="0,10,0,0" />
+                   FontSize="13" Foreground="{DynamicResource MutedInk}" Margin="0,12,0,0" />
     </Grid>
 </Window>

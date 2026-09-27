@@ -3,6 +3,7 @@ name: Windows build and UI check
 on:
   push:
   pull_request:
+  workflow_dispatch:
 
 jobs:
   windows:
