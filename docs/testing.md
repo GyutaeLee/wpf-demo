@@ -2,7 +2,7 @@
 
 ## Windows에서 실행
 
-1. [확인한 Windows Actions 실행](https://github.com/GyutaeLee/wpf-demo/actions/runs/36323609412)을 엽니다.
+1. [확인한 Windows Actions 실행](https://github.com/GyutaeLee/wpf-demo/actions/runs/36360298350)을 엽니다.
 2. `wpf-demo-windows` 산출물을 내려받아 압축을 풉니다.
 3. 안에 있는 `wpf-demo-windows-demo.zip`도 풉니다.
 4. 첫 PowerShell 창에서 API를 실행합니다.
@@ -17,6 +17,17 @@
 ```
 
 API는 `http://127.0.0.1:5187`에서 요청을 받습니다. API는 Windows x64 자체 포함 배포본입니다. WPF 앱을 실행하려면 .NET Framework 4.8 이상이 필요합니다. 실행 파일 사용에는 Visual Studio가 필요하지 않습니다.
+
+## Mac에서 화면 확인
+
+Mac에서 Actions 실행을 시작하면 GitHub의 Windows 환경이 API와 WPF 앱을 실행합니다. 현재 구성에서는 실행이 끝난 뒤 캡처와 영상을 내려받아 볼 수 있습니다. Windows 화면을 실시간으로 원격 조작하는 기능은 없습니다.
+
+1. [Windows workflow](https://github.com/GyutaeLee/wpf-demo/actions/workflows/windows.yml)를 엽니다.
+2. `Run workflow`에서 `main`을 선택하고 실행합니다.
+3. 완료된 실행에서 `wpf-demo-windows` 산출물을 받아 압축을 풉니다.
+4. `runs` 아래 시나리오별 `screenshots`의 PNG와 `videos`의 MP4를 엽니다.
+
+이미 통과한 [실행 결과](https://github.com/GyutaeLee/wpf-demo/actions/runs/36360298350)는 다시 실행하지 않고 내려받아도 됩니다. 새 실행을 시작하려면 저장소 쓰기 권한이 필요합니다. [GitHub의 수동 실행 안내](https://docs.github.com/en/actions/how-tos/manage-workflow-runs/manually-run-a-workflow)를 참고하세요.
 
 ## 자동 시나리오
 
@@ -43,15 +54,21 @@ macOS에서 실행한 테스트는 .NET 10 테스트 프로젝트를 대상으�
 
 | 확인 항목 | 상태 |
 | --- | --- |
-| macOS .NET 테스트 | 2026-09-27, MSTest 32개 통과 |
-| Windows x64 빌드·테스트·시연 | [Actions 실행](https://github.com/GyutaeLee/wpf-demo/actions/runs/36323609412), MSTest 32개와 다섯 시나리오 통과 |
-| 키보드와 창 크기 | Tab·Enter·Esc, 작은 창과 최대화의 UI 요소 좌표를 자동 검사 |
+| macOS .NET 테스트 | 2026-09-28, MSTest 32개 통과 |
+| Windows x64 빌드·테스트·시연 | [Actions 실행](https://github.com/GyutaeLee/wpf-demo/actions/runs/36360298350), MSTest 32개와 다섯 시나리오 통과 |
+| 키보드와 창 크기 | Tab·Enter·Esc, 키보드로 상태 필터 변경, 작은 창과 최대화의 UI 요소 좌표를 자동 검사 |
 | 100%·150% 배율, Narrator, 고대비 | Windows에서 직접 확인 전 |
 
 Windows workflow에는 WPF 빌드와 다섯 시나리오 실행이 들어 있습니다. 통과한 실행의 산출물에는 그 실행에서 만든 캡처·영상과 실행 파일이 함께 올라갑니다. 작은 창 검사는 모든 문구와 실제 디스플레이 배율에서의 가독성까지 확인하지 않습니다.
 
 ## 화면과 영상
 
-같은 Actions 산출물의 `runs` 폴더에는 시나리오별 `result.json`, `screenshots`, `videos`가 있습니다. `result.json`에 장비 상태·대여 이력 건수·작업 키를 기록했습니다. 영상은 H.264 MP4이며 30~60초 길이입니다. 길이와 시작·중간·끝 프레임을 확인했습니다.
+같은 Actions 산출물의 `runs` 폴더에는 시나리오별 `result.json`, `screenshots`, `videos`가 있습니다. `result.json`에 장비 상태·대여 이력 건수·작업 키를 기록했습니다. 영상 여섯 개는 H.264 MP4이며 30~60초 길이입니다. 길이와 시작·중간·끝 프레임, 화면 상태 전환을 확인했습니다.
 
 `Basic`은 대여·반납, `ConcurrentLoan`은 오래된 조회 결과의 충돌, `LostResponse`와 `ApiDown`은 같은 요청으로 재시도하는 흐름입니다. `RestartRecovery` 영상 두 개는 종료 전과 복구 후 화면이며, 같은 작업 키와 이력 한 건으로 연결됩니다.
+
+대표 영상은 저장소에도 넣었습니다. [대여·반납 MP4](videos/basic.mp4)는 30초, [응답 유실과 재시도 MP4](videos/lost-response-retry.mp4)는 60초입니다. GitHub에서 MP4가 재생되지 않으면 파일을 내려받아 엽니다. README의 GIF는 대여·반납 영상의 첫 11.5초입니다. 아래 GIF는 응답 유실 영상의 첫 12초입니다. 두 GIF 모두 같은 실행의 실제 녹화에서 만들었습니다.
+
+![응답 유실 후 같은 요청으로 재시도](videos/lost-response-retry.gif)
+
+이 실행의 응답 유실 시나리오에서는 같은 작업 키로 두 번 전송했고, 재시도 전후 대여 이력은 한 건으로 유지됐습니다. 모든 시나리오의 원본 영상과 결과 파일은 Actions 산출물에서 확인할 수 있습니다.

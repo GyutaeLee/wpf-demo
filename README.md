@@ -4,14 +4,22 @@
 
 ![장비 대여와 이력 화면](docs/screenshots/lending.png)
 
+## 시연
+
+Windows에서 실제 앱을 녹화했습니다. 아래 GIF는 대여·반납 영상의 일부입니다.
+
+![대여·반납 시연](docs/videos/basic.gif)
+
+[대여·반납 MP4](docs/videos/basic.mp4) · [응답 유실과 재시도 MP4](docs/videos/lost-response-retry.mp4)
+
 ## Windows에서 실행
 
-[확인한 Windows Actions 실행](https://github.com/GyutaeLee/wpf-demo/actions/runs/36323609412)에서 `wpf-demo-windows` 산출물을 받습니다. 압축을 풀고 안의 `wpf-demo-windows-demo.zip`도 풉니다.
+[확인한 Windows Actions 실행](https://github.com/GyutaeLee/wpf-demo/actions/runs/36360298350)에서 `wpf-demo-windows` 산출물을 받습니다. 압축을 풀고 안의 `wpf-demo-windows-demo.zip`도 풉니다.
 
 1. `api\WpfDemo.Api.exe`를 실행합니다.
 2. 다른 터미널에서 `client\WpfDemo.exe`를 실행합니다.
 
-WPF 앱에는 .NET Framework 4.8 이상이 필요합니다. 자동 시나리오 실행은 [테스트 안내](docs/testing.md)를 참고하세요.
+WPF 앱에는 .NET Framework 4.8 이상이 필요합니다. 자동 시나리오와 Mac에서 화면을 확인하는 순서는 [테스트 안내](docs/testing.md)를 참고하세요.
 
 ## 구현
 
