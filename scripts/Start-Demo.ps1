@@ -145,7 +145,7 @@ function Start-Recording {
     $env:WINAPP_UI_WORKFLOW_ID = [guid]::NewGuid().ToString()
     $recordingLog = "$Path.json"
     $recordingError = "$Path.stderr.log"
-    $arguments = "ui record -a $ProcessId --duration-sec $DurationSeconds --fps 8 --max-edge 1280 --frames --output `"$Path`" --json"
+    $arguments = "ui record -a $ProcessId --capture-screen --duration-sec $DurationSeconds --fps 8 --max-edge 1280 --frames --output `"$Path`" --json"
     $recorder = Start-Process -FilePath (Get-Command winapp).Source -ArgumentList $arguments -PassThru `
         -RedirectStandardOutput $recordingLog -RedirectStandardError $recordingError
     Start-Sleep -Seconds 2
@@ -512,11 +512,13 @@ function Invoke-RestartRecovery {
             $recovered.historyOperationIds[0] -ne $operation.operationId) {
             throw 'Restart recovery did not replay the same operation identity.'
         }
+        Select-Equipment $client
         Save-Screenshot $client (Join-Path $run 'screenshots\02-after-restart.png')
         Invoke-Ui -Verb 'set-value' -Selector 'SearchBox' -Value 'EQ-1001' -ProcessId $client.Id
         Start-Sleep -Seconds 2
         Invoke-Ui -Verb 'set-value' -Selector 'SearchBox' -Value '' -ProcessId $client.Id
         Invoke-WinApp -Arguments @('ui', 'wait-for', 'Equipment1002', '-a', [string]$client.Id, '-t', '5000')
+        Select-Equipment $client
         Complete-Recording $recoveryRecorder (Join-Path $run 'videos\02-after-restart.mp4'); $recoveryRecorder = $null
         Stop-OwnedProcess $api; $api = $null
         $loggedAttempts = Wait-ForOperationLog (Join-Path $run 'logs') $operation.operationId
