@@ -451,6 +451,8 @@ function Invoke-ApiDown {
         Stop-OwnedProcess $api; $api = $null
         Begin-Borrow $client 'API unavailable demo'
         Invoke-WinApp -Arguments @('ui', 'wait-for', 'RetryButton', '-a', [string]$client.Id, '-t', '30000')
+        Invoke-WinApp -Arguments @('ui', 'wait-for', 'OperationStatus', '-a', [string]$client.Id,
+            '--value', '요청 결과를 확인하지 못했습니다. 같은 요청으로 다시 시도할 수 있습니다.', '-t', '30000')
         $pendingPath = Join-Path $clientData 'pending-operation.json'
         $operation = Get-Content $pendingPath -Raw | ConvertFrom-Json
         $bodyHash = Get-OperationBodyHash $operation.bodyJson
@@ -488,6 +490,8 @@ function Invoke-RestartRecovery {
         $recorder = Start-Recording $client.Id (Join-Path $run 'videos\01-before-restart.mp4')
         Begin-Borrow $client 'restart recovery demo'
         Invoke-WinApp -Arguments @('ui', 'wait-for', 'RetryButton', '-a', [string]$client.Id, '-t', '30000')
+        Invoke-WinApp -Arguments @('ui', 'wait-for', 'OperationStatus', '-a', [string]$client.Id,
+            '--value', '요청 결과를 확인하지 못했습니다. 같은 요청으로 다시 시도할 수 있습니다.', '-t', '30000')
         $pendingPath = Join-Path $clientData 'pending-operation.json'
         $operation = Get-Content $pendingPath -Raw | ConvertFrom-Json
         $bodyHash = Get-OperationBodyHash $operation.bodyJson
