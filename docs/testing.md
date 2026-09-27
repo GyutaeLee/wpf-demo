@@ -2,7 +2,7 @@
 
 ## Windows에서 실행
 
-1. [Windows Actions](https://github.com/GyutaeLee/wpf-demo/actions/workflows/windows.yml)에서 장비 대여 버전을 포함한 성공 실행을 엽니다. 이전 업무 목록 버전의 산출물은 사용하지 않습니다.
+1. [확인한 Windows Actions 실행](https://github.com/GyutaeLee/wpf-demo/actions/runs/36323609412)을 엽니다.
 2. `wpf-demo-windows` 산출물을 내려받아 압축을 풉니다.
 3. 안에 있는 `wpf-demo-windows-demo.zip`도 풉니다.
 4. 첫 PowerShell 창에서 API를 실행합니다.
@@ -44,7 +44,14 @@ macOS에서 실행한 테스트는 .NET 10 테스트 프로젝트를 대상으�
 | 확인 항목 | 상태 |
 | --- | --- |
 | macOS .NET 테스트 | 2026-09-27, MSTest 32개 통과 |
-| 장비 대여 버전 Windows 빌드와 시나리오 | 이 버전의 Windows Actions 실행 대기 |
-| 창 크기, 100%·150% 배율, Narrator, 고대비 | Windows에서 직접 확인 전 |
+| Windows x64 빌드·테스트·시연 | [Actions 실행](https://github.com/GyutaeLee/wpf-demo/actions/runs/36323609412), MSTest 32개와 다섯 시나리오 통과 |
+| 키보드와 창 크기 | Tab·Enter·Esc, 작은 창과 최대화의 UI 요소 좌표를 자동 검사 |
+| 100%·150% 배율, Narrator, 고대비 | Windows에서 직접 확인 전 |
 
 Windows workflow에는 WPF 빌드와 다섯 시나리오 실행이 들어 있습니다. 통과한 실행의 산출물에는 그 실행에서 만든 캡처·영상과 실행 파일이 함께 올라갑니다. 작은 창 검사는 모든 문구와 실제 디스플레이 배율에서의 가독성까지 확인하지 않습니다.
+
+## 화면과 영상
+
+같은 Actions 산출물의 `runs` 폴더에는 시나리오별 `result.json`, `screenshots`, `videos`가 있습니다. `result.json`에 장비 상태·대여 이력 건수·작업 키를 기록했습니다. 영상은 H.264 MP4이며 30~60초 길이입니다. 길이와 시작·중간·끝 프레임을 확인했습니다.
+
+`Basic`은 대여·반납, `ConcurrentLoan`은 오래된 조회 결과의 충돌, `LostResponse`와 `ApiDown`은 같은 요청으로 재시도하는 흐름입니다. `RestartRecovery` 영상 두 개는 종료 전과 복구 후 화면이며, 같은 작업 키와 이력 한 건으로 연결됩니다.
