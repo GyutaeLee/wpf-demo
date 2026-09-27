@@ -43,7 +43,7 @@ public static class DemoWindowApi {
 '@
 
 function Invoke-WinApp {
-    param([Parameter(Mandatory)][string[]]$Arguments)
+    param([Parameter(Mandatory)][AllowEmptyString()][string[]]$Arguments)
     $null = & winapp @Arguments
     if ($LASTEXITCODE -ne 0) { throw "WinAppCLI failed ($LASTEXITCODE): winapp $($Arguments -join ' ')" }
 }
