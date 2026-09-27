@@ -140,12 +140,12 @@ function Stop-OwnedProcess {
 }
 
 function Start-Recording {
-    param([int]$ProcessId, [string]$Path)
+    param([int]$ProcessId, [string]$Path, [int]$DurationSeconds = 30)
     New-Item -ItemType Directory -Force (Split-Path $Path -Parent) | Out-Null
     $env:WINAPP_UI_WORKFLOW_ID = [guid]::NewGuid().ToString()
     $recordingLog = "$Path.json"
     $recordingError = "$Path.stderr.log"
-    $arguments = "ui record -a $ProcessId --duration-sec 30 --fps 8 --max-edge 1280 --frames --output `"$Path`" --json"
+    $arguments = "ui record -a $ProcessId --duration-sec $DurationSeconds --fps 8 --max-edge 1280 --frames --output `"$Path`" --json"
     $recorder = Start-Process -FilePath (Get-Command winapp).Source -ArgumentList $arguments -PassThru `
         -RedirectStandardOutput $recordingLog -RedirectStandardError $recordingError
     Start-Sleep -Seconds 2
@@ -410,7 +410,7 @@ function Invoke-LostResponse {
     try {
         $api = Start-Api $serverData $true (Join-Path $run 'logs')
         $client = Start-Client $clientData 'A'
-        $recorder = Start-Recording $client.Id (Join-Path $run 'videos\lost-response-retry.mp4')
+        $recorder = Start-Recording $client.Id (Join-Path $run 'videos\lost-response-retry.mp4') -DurationSeconds 60
         Begin-Borrow $client 'lost response demo'
         Invoke-WinApp -Arguments @('ui', 'wait-for', 'RetryButton', '-a', [string]$client.Id, '-t', '30000')
         Invoke-WinApp -Arguments @('ui', 'wait-for', 'OperationStatus', '-a', [string]$client.Id, '--value', '요청 결과를 확인하지 못했습니다. 같은 요청으로 다시 시도할 수 있습니다.', '-t', '5000')
@@ -447,7 +447,7 @@ function Invoke-ApiDown {
     try {
         $api = Start-Api $serverData $false (Join-Path $run 'logs')
         $client = Start-Client $clientData 'A'
-        $recorder = Start-Recording $client.Id (Join-Path $run 'videos\api-down-retry.mp4')
+        $recorder = Start-Recording $client.Id (Join-Path $run 'videos\api-down-retry.mp4') -DurationSeconds 60
         Stop-OwnedProcess $api; $api = $null
         Begin-Borrow $client 'API unavailable demo'
         Invoke-WinApp -Arguments @('ui', 'wait-for', 'RetryButton', '-a', [string]$client.Id, '-t', '30000')
