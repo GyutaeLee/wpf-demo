@@ -637,11 +637,27 @@ function Invoke-LargeList {
         Invoke-WinApp -Arguments @('ui', 'wait-for', 'EquipmentPageLabel', '-a', [string]$client.Id,
             '--value', '1 / 200 페이지 · 10,000개', '-t', '10000')
         Select-Equipment $client
+        Invoke-WinApp -Arguments @('ui', 'scroll-into-view', 'HistoryPageLabel', '-a', [string]$client.Id)
         Invoke-WinApp -Arguments @('ui', 'wait-for', 'HistoryPageLabel', '-a', [string]$client.Id,
             '--value', '1 / 400 페이지 · 20,000개', '-t', '15000')
+        Save-Screenshot $client (Join-Path $run 'screenshots\03-history-first-page.png')
         Invoke-Ui -Verb 'click' -Selector 'NextHistoryPage' -ProcessId $client.Id
+        $expectedHistoryPageRequest = '/api/equipment/1001/history?page=2&pageSize=50 - 200'
+        $apiLog = Join-Path $run 'logs\api.stdout.log'
+        $historyPageLoaded = $false
+        for ($attempt = 0; $attempt -lt 100; $attempt++) {
+            if ([System.IO.File]::ReadAllText($apiLog).Contains($expectedHistoryPageRequest)) {
+                $historyPageLoaded = $true
+                break
+            }
+            Start-Sleep -Milliseconds 100
+        }
+        if (-not $historyPageLoaded) { throw 'The API did not return history page 2 successfully.' }
+        Invoke-WinApp -Arguments @('ui', 'wait-for', 'HistoryLoadingIndicator', '--gone', '-a', [string]$client.Id, '-t', '15000')
+        Invoke-WinApp -Arguments @('ui', 'scroll-into-view', 'HistoryPageLabel', '-a', [string]$client.Id)
         Invoke-WinApp -Arguments @('ui', 'wait-for', 'HistoryPageLabel', '-a', [string]$client.Id,
             '--value', '2 / 400 페이지 · 20,000개', '-t', '10000')
+        Save-Screenshot $client (Join-Path $run 'screenshots\04-history-second-page.png')
         Write-ScenarioResult $run 'LargeList' @{ equipmentTotal = $catalog.totalCount; equipmentPageSize = 50; historyTotal = $history.totalCount; historyPageSize = 50 }
     } finally {
         Stop-OwnedProcess $client

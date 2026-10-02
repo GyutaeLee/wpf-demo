@@ -270,7 +270,8 @@
                                     <TextBlock Text="{Binding HistoryPageLabel}" FontSize="13" Foreground="{DynamicResource MutedInk}"
                                                VerticalAlignment="Center" AutomationProperties.AutomationId="HistoryPageLabel" />
                                     <TextBlock Text="불러오는 중…" FontSize="13" Foreground="{DynamicResource MutedInk}" Margin="8,0,0,0"
-                                               Visibility="{Binding IsLoadingHistory, Converter={StaticResource BooleanToVisibility}}" />
+                                               Visibility="{Binding IsLoadingHistory, Converter={StaticResource BooleanToVisibility}}"
+                                               AutomationProperties.AutomationId="HistoryLoadingIndicator" />
                                 </StackPanel>
                             </Grid>
                             <TextBlock Text="{Binding HistoryCacheNotice}" Foreground="{DynamicResource {x:Static SystemColors.InfoTextBrushKey}}"
