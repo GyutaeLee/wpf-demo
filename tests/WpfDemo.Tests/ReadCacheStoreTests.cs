@@ -9,6 +9,21 @@ public sealed class ReadCacheStoreTests
     private const string ApiAddress = "http://127.0.0.1:5187";
 
     [TestMethod]
+    public void DisposedCacheReleasesDatabaseFileForExclusiveAccess()
+    {
+        using var fixture = new CacheFixture();
+        using (var cache = new ReadCacheStore(fixture.DatabasePath))
+        {
+            cache.SaveEquipmentPage(ApiAddress,
+                EquipmentResponse("dataset-a", Equipment(1001, "EQ-1001", EquipmentStates.Available)));
+            Assert.AreEqual(1, cache.GetEquipmentPage(ApiAddress, "", EquipmentStates.All, 1, 50).CachedItemCount);
+        }
+
+        using var database = new FileStream(fixture.DatabasePath, FileMode.Open, FileAccess.ReadWrite, FileShare.None);
+        Assert.IsTrue(database.Length > 0);
+    }
+
+    [TestMethod]
     public void EquipmentCacheFiltersPagesAndSeparatesApiAndDataset()
     {
         using var fixture = new CacheFixture();

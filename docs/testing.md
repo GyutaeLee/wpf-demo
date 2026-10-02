@@ -77,8 +77,10 @@ README와 아래 GIF는 이 짧은 영상에서 만들었습니다. GitHub에서
 
 ## 확장 변경분의 현재 확인 상태
 
-macOS에서 `dotnet test tests/WpfDemo.Tests/WpfDemo.Tests.csproj -c Release --no-restore`를 실행해 MSTest 52개가 통과했습니다. 여기에는 API 페이지 처리, 대규모 데이터 생성, 오프라인 캐시, 요청 재시도와 진단 ZIP의 개인정보 제외 검사가 포함됩니다. 대량 데이터의 대여 중 장비 반납, 데이터셋 교체 후 이전 이력의 캐시 저장 거부, 작성이 끝난 ZIP만 노출되는지도 확인합니다.
+macOS에서 `dotnet test tests/WpfDemo.Tests/WpfDemo.Tests.csproj -c Release --no-restore`를 실행해 MSTest 53개가 통과했습니다. 여기에는 API 페이지 처리, 대규모 데이터 생성, 오프라인 캐시, 요청 재시도와 진단 ZIP의 개인정보 제외 검사가 포함됩니다. 대량 데이터의 대여 중 장비 반납, 데이터셋 교체 후 이전 이력의 캐시 저장 거부, 작성이 끝난 ZIP만 노출되는지도 확인합니다. 캐시 사용을 마친 뒤 DB 파일을 독점으로 다시 열 수 있는지도 검사합니다.
 
-현재 로컬 변경분은 Windows 빌드나 화면에서 아직 실행하지 않았습니다. `.github/workflows/windows.yml`은 .NET Framework WPF 빌드, 여섯 UI 시나리오, 기본 시나리오의 진단 ZIP, 그리고 장비 10,000개·이력 20,000개에서의 조회 측정을 실행하도록 구성했습니다. 이 수정분의 Windows Actions 결과는 아직 없습니다. 측정 결과는 `artifacts/performance/large-profile.json`에 기록하며 이전 구현보다 빨라졌다는 근거로 사용하지 않습니다.
+2026-10-02의 [첫 Windows 실행](https://github.com/GyutaeLee/wpf-demo/actions/runs/36968146670)은 테스트 46개가 통과하고 6개가 실패했습니다. 실패는 모두 테스트 종료 시 캐시 DB 파일을 삭제하는 과정에서 발생했습니다. 캐시의 연결 풀 사용을 끄고 파일 핸들 해제를 검사하는 테스트를 추가했습니다. [연결 풀은 기본으로 활성화됩니다](https://learn.microsoft.com/en-us/dotnet/standard/data/sqlite/connection-strings#pooling). 이 수정은 위 macOS 테스트에서 확인했으며 Windows 재검증은 남아 있습니다.
+
+첫 실행은 테스트 단계에서 멈춰 WPF 빌드와 화면 시연, 조회 측정을 실행하지 못했습니다. `.github/workflows/windows.yml`은 .NET Framework WPF 빌드, 여섯 UI 시나리오, 기본 시나리오의 진단 ZIP, 그리고 장비 10,000개·이력 20,000개에서의 조회 측정을 실행하도록 구성했습니다. 측정 결과는 `artifacts/performance/large-profile.json`에 기록하며 이전 구현보다 빨라졌다는 근거로 사용하지 않습니다.
 
 `All`은 기본 대여·반납, 두 클라이언트 충돌, 응답 유실, API 중단, 재시작 복구, 대량 목록 등 여섯 흐름을 실행합니다. `Basic` 자동 시연은 진단 ZIP을 클라이언트 데이터 폴더 아래 별도 경로에 저장합니다. 직접 실행할 때 앱은 기본적으로 Windows 문서 폴더에 내보내며, `WPFDEMO_DIAGNOSTICS_OUTPUT_DIR` 환경 변수로 경로를 지정할 수 있습니다. ZIP에는 네 개의 JSON 파일이 있고, 자동 검사는 항목 이름과 시연 메모·출력 경로 제외를 확인합니다.

@@ -26,6 +26,7 @@ namespace WpfDemo
             {
                 DataSource = _databasePath,
                 Mode = SqliteOpenMode.ReadWriteCreate,
+                Pooling = false, // Release the cache file handle when each connection closes.
                 DefaultTimeout = 5
             }.ToString();
 
