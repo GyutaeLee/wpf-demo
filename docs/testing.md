@@ -67,7 +67,9 @@ macOS에서 실행한 테스트는 .NET 10 테스트 프로젝트를 대상으�
 
 `Basic`은 대여·반납, `ConcurrentLoan`은 오래된 조회 결과의 충돌, `LostResponse`와 `ApiDown`은 같은 요청으로 재시도하는 흐름입니다. `RestartRecovery` 영상 두 개는 종료 전과 복구 후 화면이며, 같은 작업 키와 이력 한 건으로 연결됩니다. `LargeList`는 대량 목록의 첫째·둘째 페이지와 긴 이력을 화면에서 확인합니다.
 
-대표 영상은 저장소에도 넣었습니다. [대여·반납 MP4](videos/basic.mp4)는 30초, [응답 유실과 재시도 MP4](videos/lost-response-retry.mp4)는 60초입니다. GitHub에서 MP4가 재생되지 않으면 파일을 내려받아 엽니다. README의 GIF는 대여·반납 영상의 첫 11.5초입니다. 아래 GIF는 응답 유실 영상의 첫 12초입니다. 두 GIF 모두 같은 실행의 실제 녹화에서 만들었습니다.
+대표 영상은 같은 실행의 녹화에서 동작 구간을 추렸습니다. [대여·반납 MP4](videos/basic.mp4)는 8.75초, [응답 유실과 재시도 MP4](videos/lost-response-retry.mp4)는 8초입니다. 긴 대기와 창 크기 검사 구간을 덜어내고, 원래 앱 화면 아래에 단계별 설명을 붙였습니다. 앱 화면의 상태나 재생 속도는 바꾸지 않았습니다. 편집 전 30초·60초 원본은 Actions 산출물에 있습니다.
+
+README와 아래 GIF는 이 짧은 영상에서 만들었습니다. GitHub에서 MP4가 재생되지 않으면 파일을 내려받아 엽니다.
 
 ![응답 유실 후 같은 요청으로 재시도](videos/lost-response-retry.gif)
 
