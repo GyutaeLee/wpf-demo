@@ -46,6 +46,18 @@ namespace WpfDemo
         [DataMember(Name = "datasetId", Order = 1)] public string DatasetId { get; set; }
         [DataMember(Name = "items", Order = 2)] public List<EquipmentItem> Items { get; set; }
         [DataMember(Name = "borrowers", Order = 3)] public List<Borrower> Borrowers { get; set; }
+        [DataMember(Name = "totalCount", Order = 4)] public int TotalCount { get; set; }
+        [DataMember(Name = "page", Order = 5)] public int Page { get; set; }
+        [DataMember(Name = "pageSize", Order = 6)] public int PageSize { get; set; }
+    }
+
+    [DataContract]
+    public sealed class LoanHistoryListResponse
+    {
+        [DataMember(Name = "items", Order = 1)] public List<LoanHistoryEntry> Items { get; set; }
+        [DataMember(Name = "totalCount", Order = 2)] public int TotalCount { get; set; }
+        [DataMember(Name = "page", Order = 3)] public int Page { get; set; }
+        [DataMember(Name = "pageSize", Order = 4)] public int PageSize { get; set; }
     }
 
     [DataContract]
@@ -98,5 +110,36 @@ namespace WpfDemo
         [DataMember(Name = "code", Order = 1)] public string Code { get; set; }
         [DataMember(Name = "message", Order = 2)] public string Message { get; set; }
         [DataMember(Name = "equipment", Order = 3)] public EquipmentItem Equipment { get; set; }
+    }
+
+    [DataContract]
+    public sealed class RequestDiagnosticEvent
+    {
+        [DataMember(Name = "requestId", Order = 1)] public string RequestId { get; set; }
+        [DataMember(Name = "occurredAtUtc", Order = 2)] public string OccurredAtUtc { get; set; }
+        [DataMember(Name = "method", Order = 3)] public string Method { get; set; }
+        [DataMember(Name = "route", Order = 4)] public string Route { get; set; }
+        [DataMember(Name = "statusCode", Order = 5)] public int StatusCode { get; set; }
+        [DataMember(Name = "elapsedMilliseconds", Order = 6)] public long ElapsedMilliseconds { get; set; }
+    }
+
+    [DataContract]
+    public sealed class DiagnosticsResponse
+    {
+        [DataMember(Name = "serverStartedAtUtc", Order = 1)] public string ServerStartedAtUtc { get; set; }
+        [DataMember(Name = "isPartial", Order = 2)] public bool IsPartial { get; set; }
+        [DataMember(Name = "events", Order = 3)] public List<RequestDiagnosticEvent> Events { get; set; }
+    }
+
+    [DataContract]
+    public sealed class ClientDiagnosticEvent
+    {
+        [DataMember(Name = "requestId", Order = 1)] public string RequestId { get; set; }
+        [DataMember(Name = "occurredAtUtc", Order = 2)] public string OccurredAtUtc { get; set; }
+        [DataMember(Name = "operation", Order = 3)] public string Operation { get; set; }
+        [DataMember(Name = "operationId", Order = 4)] public string OperationId { get; set; }
+        [DataMember(Name = "statusCode", Order = 5)] public int StatusCode { get; set; }
+        [DataMember(Name = "elapsedMilliseconds", Order = 6)] public long ElapsedMilliseconds { get; set; }
+        [DataMember(Name = "result", Order = 7)] public string Result { get; set; }
     }
 }

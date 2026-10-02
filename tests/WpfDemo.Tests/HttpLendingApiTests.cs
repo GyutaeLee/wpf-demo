@@ -31,6 +31,23 @@ public sealed class HttpLendingApiTests
         Assert.IsFalse(vm.CanBorrow);
     }
 
+    [TestMethod]
+    public async Task EquipmentReadEncodesSearchAndPassesCancellationToHttpClient()
+    {
+        using var handler = new BlockingGetHandler();
+        using var client = new HttpClient(handler);
+        var api = new HttpLendingApi("http://127.0.0.1:5187", client);
+        using var cancellation = new CancellationTokenSource();
+        var request = api.GetEquipmentAsync("A&B +", EquipmentStates.Available, 2, 50, cancellation.Token);
+
+        var sent = await handler.Request.Task.WaitAsync(TimeSpan.FromSeconds(2));
+        StringAssert.Contains(sent.RequestUri.Query, "q=A%26B%20%2B");
+        StringAssert.Contains(sent.RequestUri.Query, "status=%EC%82%AC%EC%9A%A9%20%EA%B0%80%EB%8A%A5");
+        StringAssert.Contains(sent.RequestUri.Query, "page=2&pageSize=50");
+        cancellation.Cancel();
+        await Assert.ThrowsExceptionAsync<TaskCanceledException>(() => request);
+    }
+
     private sealed class FixedResponseHandler : HttpMessageHandler
     {
         private readonly HttpStatusCode _status;
@@ -38,6 +55,17 @@ public sealed class HttpLendingApiTests
         public FixedResponseHandler(HttpStatusCode status, string body) { _status = status; _body = body; }
         protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken) =>
             Task.FromResult(new HttpResponseMessage(_status) { Content = new StringContent(_body) });
+    }
+
+    private sealed class BlockingGetHandler : HttpMessageHandler
+    {
+        public TaskCompletionSource<HttpRequestMessage> Request { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
+        {
+            Request.TrySetResult(request);
+            await Task.Delay(Timeout.Infinite, cancellationToken);
+            throw new InvalidOperationException("A canceled read unexpectedly completed.");
+        }
     }
 
     private sealed class MemoryStore : IPendingOperationStore

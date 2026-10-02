@@ -12,26 +12,55 @@ public sealed class LendingStore
     private readonly string _connectionString;
     private readonly string _datasetId;
 
-    public LendingStore(string directory)
+    public LendingStore(string directory, string profile = null)
     {
         Directory.CreateDirectory(directory);
         var path = Path.Combine(Path.GetFullPath(directory), "wpf-demo.db");
         _connectionString = new SqliteConnectionStringBuilder { DataSource = path, Mode = SqliteOpenMode.ReadWriteCreate }.ToString();
-        _datasetId = Initialize();
+        _datasetId = Initialize(profile);
     }
 
-    public EquipmentListResponse GetEquipment()
+    public EquipmentListResponse GetEquipment() => GetEquipment("", EquipmentStates.All, 1, 50);
+
+    public EquipmentItem GetEquipment(int equipmentId)
     {
         using var connection = Open();
+        return GetEquipment(connection, null, equipmentId);
+    }
+
+    public EquipmentListResponse GetEquipment(string query, string status, int page, int pageSize)
+    {
+        using var connection = Open();
+        using var transaction = connection.BeginTransaction();
+        var normalizedQuery = (query ?? "").Trim();
+        var normalizedStatus = status == EquipmentStates.All ? "" : (status ?? "");
+        var where = "($query = '' OR instr(lower(e.Code), lower($query)) > 0 OR instr(lower(e.Name), lower($query)) > 0 OR instr(lower(e.Category), lower($query)) > 0) AND ($status = '' OR e.Status = $status)";
+        int totalCount;
+        using (var count = connection.CreateCommand())
+        {
+            count.Transaction = transaction;
+            count.CommandText = "SELECT COUNT(*) FROM Equipment e WHERE " + where + ";";
+            count.Parameters.AddWithValue("$query", normalizedQuery);
+            count.Parameters.AddWithValue("$status", normalizedStatus);
+            totalCount = Convert.ToInt32(count.ExecuteScalar(), System.Globalization.CultureInfo.InvariantCulture);
+        }
         using var command = connection.CreateCommand();
+        command.Transaction = transaction;
         command.CommandText = """
             SELECT e.Id, e.Code, e.Name, e.Category, e.Status, e.Version,
                    l.Id, l.BorrowerId, b.DisplayName, l.BorrowedAtUtc
             FROM Equipment e
             LEFT JOIN Loans l ON l.EquipmentId = e.Id AND l.ReturnedAtUtc IS NULL
             LEFT JOIN Borrowers b ON b.Id = l.BorrowerId
-            ORDER BY e.Id;
+            WHERE ($query = '' OR instr(lower(e.Code), lower($query)) > 0 OR instr(lower(e.Name), lower($query)) > 0 OR instr(lower(e.Category), lower($query)) > 0)
+              AND ($status = '' OR e.Status = $status)
+            ORDER BY e.Id
+            LIMIT $pageSize OFFSET $offset;
             """;
+        command.Parameters.AddWithValue("$query", normalizedQuery);
+        command.Parameters.AddWithValue("$status", normalizedStatus);
+        command.Parameters.AddWithValue("$pageSize", pageSize);
+        command.Parameters.AddWithValue("$offset", (long)(page - 1) * pageSize);
         var items = new List<EquipmentItem>();
         using (var reader = command.ExecuteReader())
         {
@@ -51,18 +80,37 @@ public sealed class LendingStore
                 items.Add(item);
             }
         }
-        return new EquipmentListResponse { DatasetId = _datasetId, Items = items, Borrowers = GetBorrowers(connection) };
+        var borrowers = GetBorrowers(connection, transaction);
+        transaction.Commit();
+        return new EquipmentListResponse
+        {
+            DatasetId = _datasetId, Items = items, Borrowers = borrowers,
+            TotalCount = totalCount, Page = page, PageSize = pageSize
+        };
     }
 
-    public IReadOnlyList<LoanHistoryEntry> GetHistory(int equipmentId)
+    public LoanHistoryListResponse GetHistory(int equipmentId, int page, int pageSize)
     {
         using var connection = Open();
+        using var transaction = connection.BeginTransaction();
+        int totalCount;
+        using (var count = connection.CreateCommand())
+        {
+            count.Transaction = transaction;
+            count.CommandText = "SELECT COUNT(*) FROM LoanHistory WHERE EquipmentId = $equipmentId;";
+            count.Parameters.AddWithValue("$equipmentId", equipmentId);
+            totalCount = Convert.ToInt32(count.ExecuteScalar(), System.Globalization.CultureInfo.InvariantCulture);
+        }
         using var command = connection.CreateCommand();
+        command.Transaction = transaction;
         command.CommandText = """
             SELECT Id, LoanId, OperationId, Kind, BorrowerName, OccurredAtUtc, Note
-            FROM LoanHistory WHERE EquipmentId = $equipmentId ORDER BY OccurredAtUtc DESC, Id DESC;
+            FROM LoanHistory WHERE EquipmentId = $equipmentId ORDER BY OccurredAtUtc DESC, Id DESC
+            LIMIT $pageSize OFFSET $offset;
             """;
         command.Parameters.AddWithValue("$equipmentId", equipmentId);
+        command.Parameters.AddWithValue("$pageSize", pageSize);
+        command.Parameters.AddWithValue("$offset", (long)(page - 1) * pageSize);
         var history = new List<LoanHistoryEntry>();
         using var reader = command.ExecuteReader();
         while (reader.Read())
@@ -73,7 +121,8 @@ public sealed class LendingStore
                 Kind = reader.GetString(3), BorrowerName = reader.GetString(4),
                 OccurredAtUtc = reader.GetString(5), Note = reader.GetString(6)
             });
-        return history;
+        transaction.Commit();
+        return new LoanHistoryListResponse { Items = history, TotalCount = totalCount, Page = page, PageSize = pageSize };
     }
 
     public IReadOnlyList<Borrower> GetBorrowers()
@@ -104,7 +153,7 @@ public sealed class LendingStore
                 result = Rejection(operationId, "Maintenance", "점검 중인 장비는 대여할 수 없습니다.", equipment);
             else if (equipment.Status == EquipmentStates.OnLoan)
                 result = Rejection(operationId, "AlreadyOnLoan", "이미 대여 중인 장비입니다.", equipment);
-            else if (!GetBorrowers(connection).Any(x => x.Id == request.BorrowerId))
+            else if (!GetBorrowers(connection, transaction).Any(x => x.Id == request.BorrowerId))
                 result = Rejection(operationId, "BorrowerNotFound", "대여자를 확인할 수 없습니다.", equipment);
         }
 
@@ -117,7 +166,7 @@ public sealed class LendingStore
         }
 
         var loanId = Guid.NewGuid().ToString("D");
-        var borrower = GetBorrowers(connection).Single(x => x.Id == request.BorrowerId);
+        var borrower = GetBorrowers(connection, transaction).Single(x => x.Id == request.BorrowerId);
         using (var update = connection.CreateCommand())
         {
             update.Transaction = transaction;
@@ -246,7 +295,7 @@ public sealed class LendingStore
         string operationId, string fingerprint, int statusCode, LoanOperationResponse response)
     {
         using var command = connection.CreateCommand();
-        command.Transaction = transaction;
+        if (transaction != null) command.Transaction = transaction;
         command.CommandText = "INSERT INTO Operations(Id, Fingerprint, StatusCode, ResponseJson) VALUES($id, $fingerprint, $status, $json);";
         command.Parameters.AddWithValue("$id", operationId);
         command.Parameters.AddWithValue("$fingerprint", fingerprint);
@@ -292,9 +341,10 @@ public sealed class LendingStore
         return item;
     }
 
-    private static List<Borrower> GetBorrowers(SqliteConnection connection)
+    private static List<Borrower> GetBorrowers(SqliteConnection connection, SqliteTransaction transaction = null)
     {
         using var command = connection.CreateCommand();
+        if (transaction != null) command.Transaction = transaction;
         command.CommandText = "SELECT Id, DisplayName FROM Borrowers ORDER BY Id;";
         var borrowers = new List<Borrower>();
         using var reader = command.ExecuteReader();
@@ -339,7 +389,7 @@ public sealed class LendingStore
         return connection;
     }
 
-    private string Initialize()
+    private string Initialize(string profile)
     {
         using var connection = Open();
         using var command = connection.CreateCommand();
@@ -394,8 +444,94 @@ public sealed class LendingStore
             equipment.Parameters.AddWithValue("$at", Timestamp(DateTime.UtcNow.AddHours(-1)));
             equipment.ExecuteNonQuery();
         }
+        if (string.Equals(profile, "Large", StringComparison.OrdinalIgnoreCase))
+            SeedLargeDataset(connection, transaction);
         transaction.Commit();
         return datasetId;
+    }
+
+    private static void SeedLargeDataset(SqliteConnection connection, SqliteTransaction transaction)
+    {
+        using (var equipment = connection.CreateCommand())
+        {
+            equipment.Transaction = transaction;
+            equipment.CommandText = """
+                WITH RECURSIVE sequence(value) AS (
+                    SELECT 1006
+                    UNION ALL SELECT value + 1 FROM sequence WHERE value < 11000
+                )
+                INSERT INTO Equipment(Id, Code, Name, Category, Status, Version)
+                SELECT value, 'EQ-' || printf('%05d', value),
+                    CASE value % 4 WHEN 0 THEN '노트북' WHEN 1 THEN '모니터' WHEN 2 THEN '테스트 장치' ELSE '휴대 장비' END || ' ' || value,
+                    CASE value % 4 WHEN 0 THEN '컴퓨터' WHEN 1 THEN '화면 장비' WHEN 2 THEN '테스트 장비' ELSE '주변 장비' END,
+                    CASE value % 17 WHEN 0 THEN '점검 중' WHEN 1 THEN '대여 중' ELSE '사용 가능' END,
+                    1
+                FROM sequence;
+                """;
+            equipment.ExecuteNonQuery();
+        }
+
+        using (var loans = connection.CreateCommand())
+        {
+            loans.Transaction = transaction;
+            loans.CommandText = """
+                WITH RECURSIVE sequence(value) AS (
+                    SELECT 1
+                    UNION ALL SELECT value + 1 FROM sequence WHERE value < 10000
+                )
+                INSERT INTO Loans(Id, EquipmentId, BorrowerId, BorrowerName, BorrowedAtUtc, ReturnedAtUtc, Note, ReturnNote)
+                SELECT 'load-loan-' || printf('%05d', value), 1001,
+                    CASE value % 2 WHEN 0 THEN 'A' ELSE 'B' END,
+                    CASE value % 2 WHEN 0 THEN '가상 대여자 A' ELSE '가상 대여자 B' END,
+                    strftime('%Y-%m-%dT%H:%M:%fZ', '2020-01-01 00:00:00', printf('+%d seconds', value * 2)),
+                    strftime('%Y-%m-%dT%H:%M:%fZ', '2020-01-01 00:00:00', printf('+%d seconds', value * 2 + 1)),
+                    '', ''
+                FROM sequence;
+                """;
+            loans.ExecuteNonQuery();
+        }
+
+        using (var activeLoans = connection.CreateCommand())
+        {
+            activeLoans.Transaction = transaction;
+            activeLoans.CommandText = """
+                INSERT INTO Loans(Id, EquipmentId, BorrowerId, BorrowerName, BorrowedAtUtc, Note)
+                SELECT 'load-active-loan-' || e.Id, e.Id,
+                    CASE e.Id % 2 WHEN 0 THEN 'A' ELSE 'B' END,
+                    CASE e.Id % 2 WHEN 0 THEN '가상 대여자 A' ELSE '가상 대여자 B' END,
+                    '2020-01-02T00:00:00.000Z', ''
+                FROM Equipment e WHERE e.Id >= 1006 AND e.Status = '대여 중';
+
+                INSERT INTO LoanHistory(Id, EquipmentId, LoanId, OperationId, Kind, BorrowerName, OccurredAtUtc, Note)
+                SELECT 'load-active-event-' || EquipmentId, EquipmentId, Id, NULL,
+                    'Borrowed', BorrowerName, BorrowedAtUtc, Note
+                FROM Loans WHERE Id LIKE 'load-active-loan-%';
+                """;
+            activeLoans.ExecuteNonQuery();
+        }
+
+        using (var history = connection.CreateCommand())
+        {
+            history.Transaction = transaction;
+            history.CommandText = """
+                WITH RECURSIVE sequence(value) AS (
+                    SELECT 1
+                    UNION ALL SELECT value + 1 FROM sequence WHERE value < 10000
+                ), events AS (
+                    SELECT value, 'Borrowed' AS kind, 'load-op-b-' || printf('%05d', value) AS operationId, value * 2 AS offsetSeconds
+                    FROM sequence
+                    UNION ALL
+                    SELECT value, 'Returned', 'load-op-r-' || printf('%05d', value), value * 2 + 1
+                    FROM sequence
+                )
+                INSERT INTO LoanHistory(Id, EquipmentId, LoanId, OperationId, Kind, BorrowerName, OccurredAtUtc, Note)
+                SELECT 'load-event-' || operationId, 1001, 'load-loan-' || printf('%05d', value), operationId, kind,
+                    CASE value % 2 WHEN 0 THEN '가상 대여자 A' ELSE '가상 대여자 B' END,
+                    strftime('%Y-%m-%dT%H:%M:%fZ', '2020-01-01 00:00:00', printf('+%d seconds', offsetSeconds)), ''
+                FROM events;
+                """;
+            history.ExecuteNonQuery();
+        }
     }
 
     private static string ReadMetadata(SqliteConnection connection, string name)

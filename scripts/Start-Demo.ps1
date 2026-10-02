@@ -1,5 +1,5 @@
 param(
-    [ValidateSet('Basic', 'ConcurrentLoan', 'LostResponse', 'ApiDown', 'RestartRecovery', 'All')]
+    [ValidateSet('Basic', 'ConcurrentLoan', 'LostResponse', 'ApiDown', 'RestartRecovery', 'LargeList', 'All')]
     [string]$Scenario = 'Basic',
     [string]$OutputRoot = ''
 )
@@ -92,6 +92,7 @@ function Start-ClientProcess {
     $env:WPFDEMO_CLIENT_DATA_DIR = $Directory
     $env:WPFDEMO_CLIENT_LABEL = $Label
     $env:WPFDEMO_API_URL = $apiAddress
+    $env:WPFDEMO_DIAGNOSTICS_OUTPUT_DIR = Join-Path $Directory 'diagnostics-export'
     return Start-Process -FilePath $clientExecutable -PassThru
 }
 
@@ -105,10 +106,11 @@ function Assert-PortAvailable {
 }
 
 function Start-Api {
-    param([string]$DataDirectory, [bool]$DropNextBorrowResponse, [string]$LogDirectory)
+    param([string]$DataDirectory, [bool]$DropNextBorrowResponse, [string]$LogDirectory, [string]$DataProfile = '')
     Assert-PortAvailable
     New-Item -ItemType Directory -Force $DataDirectory, $LogDirectory | Out-Null
     $env:WPFDEMO_SERVER_DATA_DIR = $DataDirectory
+    $env:WPFDEMO_DATASET_PROFILE = $DataProfile
     $env:WPFDEMO_DEMO_DROP_NEXT_BORROW_RESPONSE = if ($DropNextBorrowResponse) { 'true' } else { 'false' }
     $stdout = Join-Path $LogDirectory 'api.stdout.log'
     $stderr = Join-Path $LogDirectory 'api.stderr.log'
@@ -120,7 +122,7 @@ function Start-Api {
             if ($process.HasExited) { throw "API exited before becoming ready (exit $($process.ExitCode))." }
             try {
                 $response = Invoke-RestMethod "$apiAddress/api/equipment" -TimeoutSec 2
-                if ($response.items.Count -eq 5) { return $process }
+                if ($response.totalCount -ge 5 -and $response.items.Count -gt 0) { return $process }
             } catch { Start-Sleep -Milliseconds 350 }
         }
         throw 'Local API did not become ready within 14 seconds.'
@@ -140,17 +142,37 @@ function Stop-OwnedProcess {
 }
 
 function Start-Recording {
-    param([int]$ProcessId, [string]$Path, [int]$DurationSeconds = 30)
+    param([int]$ProcessId, [string]$Path, [int]$DurationSeconds = 30, [switch]$StopOnCompletion)
     New-Item -ItemType Directory -Force (Split-Path $Path -Parent) | Out-Null
     $env:WINAPP_UI_WORKFLOW_ID = [guid]::NewGuid().ToString()
     $recordingLog = "$Path.json"
     $recordingError = "$Path.stderr.log"
-    $arguments = "ui record -a $ProcessId --capture-screen --duration-sec $DurationSeconds --fps 8 --max-edge 1280 --frames --output `"$Path`" --json"
-    $recorder = Start-Process -FilePath (Get-Command winapp).Source -ArgumentList $arguments -PassThru `
-        -RedirectStandardOutput $recordingLog -RedirectStandardError $recordingError
+    if ($StopOnCompletion) {
+        # A newline gracefully finalizes WinAppCLI's unbounded recording.
+        $startInfo = [System.Diagnostics.ProcessStartInfo]::new((Get-Command winapp).Source)
+        $startInfo.UseShellExecute = $false
+        $startInfo.CreateNoWindow = $true
+        $startInfo.RedirectStandardInput = $true
+        $startInfo.RedirectStandardOutput = $true
+        $startInfo.RedirectStandardError = $true
+        foreach ($argument in @('ui', 'record', '-a', [string]$ProcessId, '--capture-screen',
+                '--fps', '8', '--max-edge', '1280', '--frames', '--output', $Path, '--json')) {
+            $startInfo.ArgumentList.Add($argument)
+        }
+        $recorder = [System.Diagnostics.Process]::Start($startInfo)
+        $recorder | Add-Member -NotePropertyName RecordingOutputTask -NotePropertyValue $recorder.StandardOutput.ReadToEndAsync()
+        $recorder | Add-Member -NotePropertyName RecordingErrorTask -NotePropertyValue $recorder.StandardError.ReadToEndAsync()
+    } else {
+        $arguments = "ui record -a $ProcessId --capture-screen --duration-sec $DurationSeconds --fps 8 --max-edge 1280 --frames --output `"$Path`" --json"
+        $recorder = Start-Process -FilePath (Get-Command winapp).Source -ArgumentList $arguments -PassThru `
+            -RedirectStandardOutput $recordingLog -RedirectStandardError $recordingError
+    }
     Start-Sleep -Seconds 2
     $recorder.Refresh()
     if ($recorder.HasExited -and $recorder.ExitCode -ne 0) {
+        if ($StopOnCompletion) {
+            [System.IO.File]::WriteAllText($recordingError, $recorder.RecordingErrorTask.GetAwaiter().GetResult())
+        }
         throw "WinAppCLI recording failed to start: $(Get-Content $recordingError -Raw)"
     }
     return $recorder
@@ -159,9 +181,18 @@ function Start-Recording {
 function Complete-Recording {
     param([System.Diagnostics.Process]$Recorder, [string]$Path)
     if ($null -eq $Recorder) { return }
+    $stopOnCompletion = $null -ne $Recorder.PSObject.Properties['RecordingOutputTask']
+    if ($stopOnCompletion -and -not $Recorder.HasExited) {
+        $Recorder.StandardInput.WriteLine()
+        $Recorder.StandardInput.Close()
+    }
     if (-not $Recorder.WaitForExit(60000)) {
         Stop-Process -Id $Recorder.Id -Force
         throw "WinAppCLI recording did not finish: $Path"
+    }
+    if ($stopOnCompletion) {
+        [System.IO.File]::WriteAllText("$Path.json", $Recorder.RecordingOutputTask.GetAwaiter().GetResult())
+        [System.IO.File]::WriteAllText("$Path.stderr.log", $Recorder.RecordingErrorTask.GetAwaiter().GetResult())
     }
     if ($Recorder.ExitCode -ne 0 -or -not (Test-Path $Path) -or (Get-Item $Path).Length -lt 10000) {
         throw "WinAppCLI did not produce a complete video: $Path"
@@ -175,8 +206,9 @@ function Complete-Recording {
     $manifest = Get-Content $manifestPath -Raw | ConvertFrom-Json
     $frameEntries = @(Get-Content $frameLogPath | ForEach-Object { $_ | ConvertFrom-Json })
     $imageCount = @(Get-ChildItem (Join-Path $framesDirectory 'frames') -Filter '*.jpg' -ErrorAction SilentlyContinue).Count
+    $minimumElapsedMs = if ($stopOnCompletion) { 5000 } else { 15000 }
     if ($manifest.status -ne 'complete' -or $frameEntries.Count -lt 3 -or $imageCount -lt 2 -or
-        [long]$frameEntries[0].elapsedMs -gt 3000 -or [long]$frameEntries[-1].elapsedMs -lt 15000) {
+        [long]$frameEntries[0].elapsedMs -gt 3000 -or [long]$frameEntries[-1].elapsedMs -lt $minimumElapsedMs) {
         throw "Video evidence is incomplete or contains no visible state change: $framesDirectory"
     }
     $result = Get-Content "$Path.json" -Raw | ConvertFrom-Json
@@ -185,13 +217,12 @@ function Complete-Recording {
 }
 
 function Get-EquipmentState {
-    $catalog = Invoke-RestMethod "$apiAddress/api/equipment" -TimeoutSec 5
-    return $catalog.items | Where-Object id -eq $equipmentId | Select-Object -First 1
+    return Invoke-RestMethod "$apiAddress/api/equipment/$equipmentId" -TimeoutSec 5
 }
 
 function Get-EquipmentHistory {
     $history = Invoke-RestMethod "$apiAddress/api/equipment/$equipmentId/history" -TimeoutSec 5
-    return $history
+    return $history.items
 }
 
 function Assert-OperationCounts {
@@ -289,6 +320,7 @@ function Send-BorrowWithEnter {
     Select-Equipment -Client $Client
     Invoke-Ui -Verb 'set-value' -Selector 'OperationNote' -Value $Note -ProcessId $Client.Id
     Invoke-Ui -Verb 'focus' -Selector 'OperationNote' -ProcessId $Client.Id
+    Start-Sleep -Milliseconds 1500
     Invoke-WinApp -Arguments @('ui', 'send-keys', 'enter', '-a', [string]$Client.Id, '--via', 'send-input')
 }
 
@@ -355,6 +387,36 @@ function Write-ScenarioResult {
     Write-Host "[$Name] passed — $Directory"
 }
 
+function Export-And-VerifyDiagnostics {
+    param([System.Diagnostics.Process]$Client, [string]$OutputDirectory)
+    Invoke-Ui -Verb 'click' -Selector 'ExportDiagnosticsButton' -ProcessId $Client.Id
+    $bundle = $null
+    for ($attempt = 0; $attempt -lt 40; $attempt++) {
+        $bundle = Get-ChildItem $OutputDirectory -Filter 'wpf-demo-diagnostics-*.zip' -ErrorAction SilentlyContinue |
+            Sort-Object LastWriteTimeUtc -Descending | Select-Object -First 1
+        if ($bundle) { break }
+        Start-Sleep -Milliseconds 250
+    }
+    if (-not $bundle) { throw 'The diagnostics button did not create a ZIP bundle.' }
+
+    Add-Type -AssemblyName System.IO.Compression.FileSystem
+    $archive = [System.IO.Compression.ZipFile]::OpenRead($bundle.FullName)
+    try {
+        $names = @($archive.Entries | ForEach-Object FullName | Sort-Object)
+        $expected = @('client-requests.json', 'current-operation.json', 'environment.json', 'server-requests.json')
+        if (Compare-Object $expected $names) { throw 'The diagnostics ZIP has an unexpected entry list.' }
+        $content = foreach ($entry in $archive.Entries) {
+            $reader = [System.IO.StreamReader]::new($entry.Open())
+            try { $reader.ReadToEnd() } finally { $reader.Dispose() }
+        }
+        $joined = $content -join "`n"
+        if ($joined.Contains('회의용 대여') -or $joined.Contains($OutputDirectory)) {
+            throw 'The diagnostics bundle contains a note or local output path.'
+        }
+    } finally { $archive.Dispose() }
+    return $bundle.Name
+}
+
 function Invoke-Basic {
     $run = New-ScenarioRun 'Basic'
     $serverData = Join-Path $run 'server'
@@ -366,7 +428,7 @@ function Invoke-Basic {
         Test-TabOrder $client
         Test-StatusDropdown $client
         Test-EscapeCancelsDraft $client
-        $recorder = Start-Recording $client.Id (Join-Path $run 'videos\basic.mp4')
+        $recorder = Start-Recording $client.Id (Join-Path $run 'videos\basic.mp4') -StopOnCompletion
         Start-Sleep -Seconds 1
         Send-BorrowWithEnter $client '회의용 대여'
         Wait-OperationNotice $client '대여가 완료되었습니다.'
@@ -378,9 +440,10 @@ function Invoke-Basic {
         Start-Sleep -Seconds 3
         $returned = Assert-OperationCounts 1 1 '사용 가능'
         Save-Screenshot $client (Join-Path $run 'screenshots\02-returned.png')
-        Assert-WindowLayouts $client $run
         Complete-Recording $recorder (Join-Path $run 'videos\basic.mp4'); $recorder = $null
-        Write-ScenarioResult $run 'Basic' @{ borrowed = $borrowed; returned = $returned }
+        Assert-WindowLayouts $client $run
+        $diagnosticBundle = Export-And-VerifyDiagnostics $client (Join-Path $clientData 'diagnostics-export')
+        Write-ScenarioResult $run 'Basic' @{ borrowed = $borrowed; returned = $returned; diagnosticBundle = $diagnosticBundle }
     } finally {
         if ($recorder) { Stop-OwnedProcess $recorder }
         Stop-OwnedProcess $client
@@ -424,8 +487,11 @@ function Invoke-LostResponse {
     try {
         $api = Start-Api $serverData $true (Join-Path $run 'logs')
         $client = Start-Client $clientData 'A'
-        $recorder = Start-Recording $client.Id (Join-Path $run 'videos\lost-response-retry.mp4') -DurationSeconds 60
-        Begin-Borrow $client 'lost response demo'
+        Select-Equipment -Client $client
+        $recorder = Start-Recording $client.Id (Join-Path $run 'videos\lost-response-retry.mp4') -StopOnCompletion
+        Invoke-Ui -Verb 'set-value' -Selector 'OperationNote' -Value '응답 유실 시 재시도' -ProcessId $client.Id
+        Start-Sleep -Milliseconds 1500
+        Invoke-Ui -Verb 'click' -Selector 'BorrowButton' -ProcessId $client.Id
         Invoke-WinApp -Arguments @('ui', 'wait-for', 'RetryButton', '-a', [string]$client.Id, '-t', '30000')
         Invoke-WinApp -Arguments @('ui', 'wait-for', 'OperationStatus', '-a', [string]$client.Id, '--value', '요청 결과를 확인하지 못했습니다. 같은 요청으로 다시 시도할 수 있습니다.', '-t', '5000')
         $pendingPath = Join-Path $clientData 'pending-operation.json'
@@ -433,8 +499,8 @@ function Invoke-LostResponse {
         $bodyHash = Get-OperationBodyHash $operation.bodyJson
         $beforeRetry = Assert-OperationCounts 1 0 '대여 중'
         Save-Screenshot $client (Join-Path $run 'screenshots\01-unknown-result.png')
-        Start-Sleep -Seconds 2
-        Invoke-Ui -Verb 'invoke' -Selector 'RetryButton' -ProcessId $client.Id
+        Start-Sleep -Seconds 4
+        Invoke-Ui -Verb 'click' -Selector 'RetryButton' -ProcessId $client.Id
         Wait-OperationNotice $client '대여가 완료되었습니다.'
         if (Test-Path $pendingPath) { throw 'The resolved client operation was not removed.' }
         $afterRetry = Assert-OperationCounts 1 0 '대여 중'
@@ -442,6 +508,7 @@ function Invoke-LostResponse {
             throw 'The pending operation key does not match the single committed history event.'
         }
         Save-Screenshot $client (Join-Path $run 'screenshots\02-retried.png')
+        Start-Sleep -Seconds 3
         Complete-Recording $recorder (Join-Path $run 'videos\lost-response-retry.mp4'); $recorder = $null
         Stop-OwnedProcess $api; $api = $null
         $loggedAttempts = Wait-ForOperationLog (Join-Path $run 'logs') $operation.operationId
@@ -544,6 +611,44 @@ function Invoke-RestartRecovery {
     }
 }
 
+function Invoke-LargeList {
+    $run = New-ScenarioRun 'LargeList'
+    $serverData = Join-Path $run 'server'
+    $clientData = Join-Path $run 'client-A'
+    $api = $null; $client = $null
+    try {
+        $api = Start-Api $serverData $false (Join-Path $run 'logs') 'Large'
+        $catalog = Invoke-RestMethod "$apiAddress/api/equipment?pageSize=100" -TimeoutSec 10
+        $history = Invoke-RestMethod "$apiAddress/api/equipment/1001/history?pageSize=100" -TimeoutSec 10
+        if ($catalog.totalCount -ne 10000 -or $history.totalCount -ne 20000) {
+            throw "Large-list scenario expected 10,000 equipment items and 20,000 history events; received $($catalog.totalCount) and $($history.totalCount)."
+        }
+
+        $client = Start-Client $clientData 'A'
+        Invoke-WinApp -Arguments @('ui', 'wait-for', 'EquipmentCount', '-a', [string]$client.Id, '--value', '10,000개', '-t', '15000')
+        Invoke-WinApp -Arguments @('ui', 'wait-for', 'EquipmentPageLabel', '-a', [string]$client.Id,
+            '--value', '1 / 200 페이지 · 10,000개', '-t', '15000')
+        Save-Screenshot $client (Join-Path $run 'screenshots\01-first-page.png')
+        Invoke-Ui -Verb 'click' -Selector 'NextEquipmentPage' -ProcessId $client.Id
+        Invoke-WinApp -Arguments @('ui', 'wait-for', 'EquipmentPageLabel', '-a', [string]$client.Id,
+            '--value', '2 / 200 페이지 · 10,000개', '-t', '10000')
+        Save-Screenshot $client (Join-Path $run 'screenshots\02-second-page.png')
+        Invoke-Ui -Verb 'click' -Selector 'PreviousEquipmentPage' -ProcessId $client.Id
+        Invoke-WinApp -Arguments @('ui', 'wait-for', 'EquipmentPageLabel', '-a', [string]$client.Id,
+            '--value', '1 / 200 페이지 · 10,000개', '-t', '10000')
+        Select-Equipment $client
+        Invoke-WinApp -Arguments @('ui', 'wait-for', 'HistoryPageLabel', '-a', [string]$client.Id,
+            '--value', '1 / 400 페이지 · 20,000개', '-t', '15000')
+        Invoke-Ui -Verb 'click' -Selector 'NextHistoryPage' -ProcessId $client.Id
+        Invoke-WinApp -Arguments @('ui', 'wait-for', 'HistoryPageLabel', '-a', [string]$client.Id,
+            '--value', '2 / 400 페이지 · 20,000개', '-t', '10000')
+        Write-ScenarioResult $run 'LargeList' @{ equipmentTotal = $catalog.totalCount; equipmentPageSize = 50; historyTotal = $history.totalCount; historyPageSize = 50 }
+    } finally {
+        Stop-OwnedProcess $client
+        Stop-OwnedProcess $api
+    }
+}
+
 if (-not (Test-Path $apiExecutable)) { throw "API executable was not found: $apiExecutable" }
 if (-not (Test-Path $clientExecutable)) { throw "WPF client was not found: $clientExecutable" }
 $version = (& winapp --version 2>&1 | Out-String).Trim()
@@ -551,12 +656,13 @@ if ($LASTEXITCODE -ne 0 -or $version -notmatch '0\.7\.0') { throw "WinAppCLI 0.7
 
 $previousEnvironment = @{}
 foreach ($name in @('WPFDEMO_API_URL', 'WPFDEMO_SERVER_DATA_DIR', 'WPFDEMO_DEMO_DROP_NEXT_BORROW_RESPONSE',
-        'WPFDEMO_CLIENT_DATA_DIR', 'WPFDEMO_CLIENT_LABEL', 'WINAPP_UI_WORKFLOW_ID')) {
+        'WPFDEMO_DATASET_PROFILE', 'WPFDEMO_CLIENT_DATA_DIR', 'WPFDEMO_CLIENT_LABEL',
+        'WPFDEMO_DIAGNOSTICS_OUTPUT_DIR', 'WINAPP_UI_WORKFLOW_ID')) {
     $previousEnvironment[$name] = [Environment]::GetEnvironmentVariable($name, 'Process')
 }
 
 try {
-    $selectedScenarios = if ($Scenario -eq 'All') { @('Basic', 'ConcurrentLoan', 'LostResponse', 'ApiDown', 'RestartRecovery') } else { @($Scenario) }
+    $selectedScenarios = if ($Scenario -eq 'All') { @('Basic', 'ConcurrentLoan', 'LostResponse', 'ApiDown', 'RestartRecovery', 'LargeList') } else { @($Scenario) }
     foreach ($selected in $selectedScenarios) {
         switch ($selected) {
             'Basic' { Invoke-Basic }
@@ -564,6 +670,7 @@ try {
             'LostResponse' { Invoke-LostResponse }
             'ApiDown' { Invoke-ApiDown }
             'RestartRecovery' { Invoke-RestartRecovery }
+            'LargeList' { Invoke-LargeList }
         }
     }
 } finally {

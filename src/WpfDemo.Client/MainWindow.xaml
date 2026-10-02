@@ -32,10 +32,26 @@
                 <TextBlock Text="장비 대여·반납" FontSize="26" FontWeight="SemiBold" Margin="0,0,0,4" />
                 <TextBlock Text="장비를 선택해 대여하거나 반납하고, 기록을 확인합니다." Foreground="{DynamicResource MutedInk}" />
             </StackPanel>
-            <Border Grid.Column="1" Background="{DynamicResource Surface}" BorderBrush="{DynamicResource Stroke}" BorderThickness="1" CornerRadius="5" Padding="12,8"
-                    VerticalAlignment="Top" Margin="12,0,0,0">
-                <TextBlock Text="가상 데이터" FontSize="13" Foreground="{DynamicResource MutedInk}" />
-            </Border>
+            <StackPanel Grid.Column="1" VerticalAlignment="Top" HorizontalAlignment="Right" Margin="12,0,0,0">
+                <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+                    <Button Content="진단 내보내기" Command="{Binding ExportDiagnosticsCommand}"
+                            IsEnabled="{Binding CanExportDiagnostics}"
+                            AutomationProperties.AutomationId="ExportDiagnosticsButton" />
+                    <Border Background="{DynamicResource Surface}" BorderBrush="{DynamicResource Stroke}" BorderThickness="1" CornerRadius="5" Padding="12,8" Margin="8,0,0,0">
+                        <TextBlock Text="가상 데이터" FontSize="13" Foreground="{DynamicResource MutedInk}" />
+                    </Border>
+                </StackPanel>
+                <controls:LiveRegionTextBlock Text="{Binding DiagnosticsMessage}" Foreground="{DynamicResource MutedInk}" FontSize="12"
+                           TextWrapping="Wrap" TextAlignment="Right" MaxWidth="260" Margin="0,6,0,0"
+                           AutomationProperties.LiveSetting="Polite" AutomationProperties.AutomationId="DiagnosticsMessage">
+                    <controls:LiveRegionTextBlock.Style><Style TargetType="controls:LiveRegionTextBlock"><Setter Property="Visibility" Value="Visible" />
+                        <Style.Triggers>
+                            <DataTrigger Binding="{Binding DiagnosticsMessage}" Value=""><Setter Property="Visibility" Value="Collapsed" /></DataTrigger>
+                            <DataTrigger Binding="{Binding DiagnosticsMessage}" Value="{x:Null}"><Setter Property="Visibility" Value="Collapsed" /></DataTrigger>
+                        </Style.Triggers>
+                    </Style></controls:LiveRegionTextBlock.Style>
+                </controls:LiveRegionTextBlock>
+            </StackPanel>
         </Grid>
 
         <Grid Grid.Row="2">
@@ -58,7 +74,7 @@
                         <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
                         <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
                             <TextBlock Text="장비 목록" FontSize="18" FontWeight="SemiBold" />
-                            <TextBlock Text="{Binding VisibleItems.Count, StringFormat={}{0}개}" FontSize="13"
+                            <TextBlock Text="{Binding EquipmentTotalCount, StringFormat={}{0:N0}개}" FontSize="13"
                                        Foreground="{DynamicResource MutedInk}" Margin="10,0,0,0" VerticalAlignment="Center"
                                        AutomationProperties.AutomationId="EquipmentCount" />
                         </StackPanel>
@@ -74,7 +90,7 @@
                         <StackPanel>
                             <TextBlock Text="검색" Foreground="{DynamicResource Ink}" Margin="0,0,0,6" />
                             <TextBox Text="{Binding SearchText, UpdateSourceTrigger=PropertyChanged}"
-                                     IsEnabled="{Binding CanNavigate}"
+                                     IsEnabled="{Binding CanChangeQuery}"
                                      AutomationProperties.Name="장비 코드, 이름 또는 분류 검색"
                                      AutomationProperties.AutomationId="SearchBox" />
                         </StackPanel>
@@ -82,7 +98,7 @@
                             <TextBlock Text="상태" Foreground="{DynamicResource Ink}" Margin="0,0,0,6" />
                             <ComboBox ItemsSource="{Binding StatusFilters}"
                                       SelectedItem="{Binding StatusFilter, Mode=TwoWay}"
-                                      IsEnabled="{Binding CanNavigate}"
+                                      IsEnabled="{Binding CanChangeQuery}"
                                       AutomationProperties.AutomationId="StatusFilter" />
                         </StackPanel>
                     </Grid>
@@ -92,10 +108,19 @@
                                    Foreground="{DynamicResource {x:Static SystemColors.InfoTextBrushKey}}"
                                    AutomationProperties.AutomationId="StaleResultsNotice" />
                     </Border>
+                    <Border Grid.Row="2" Background="{DynamicResource {x:Static SystemColors.InfoBrushKey}}" CornerRadius="4" Padding="8,5" Margin="0,8,0,0"
+                            Visibility="{Binding IsShowingCachedData, Converter={StaticResource BooleanToVisibility}}">
+                        <TextBlock Text="{Binding CacheNotice}" FontSize="13" TextWrapping="Wrap"
+                                   Foreground="{DynamicResource {x:Static SystemColors.InfoTextBrushKey}}"
+                                   AutomationProperties.AutomationId="CachedEquipmentNotice" />
+                    </Border>
                     <Grid Grid.Row="3">
+                        <Grid.RowDefinitions><RowDefinition Height="*" /><RowDefinition Height="Auto" /></Grid.RowDefinitions>
                         <ListBox ItemsSource="{Binding VisibleItems}" SelectedItem="{Binding SelectedItem, Mode=TwoWay}"
                                  IsEnabled="{Binding CanNavigate}" BorderThickness="0" Background="Transparent"
-                                 ScrollViewer.VerticalScrollBarVisibility="Auto" ScrollViewer.HorizontalScrollBarVisibility="Disabled" Margin="0,12,0,0"
+                                 ScrollViewer.VerticalScrollBarVisibility="Auto" ScrollViewer.HorizontalScrollBarVisibility="Disabled"
+                                 ScrollViewer.CanContentScroll="True" VirtualizingPanel.IsVirtualizing="True"
+                                 VirtualizingPanel.VirtualizationMode="Recycling" Margin="0,12,0,0"
                                  AutomationProperties.Name="장비 목록"
                                  AutomationProperties.AutomationId="EquipmentList">
                             <ListBox.ItemContainerStyle>
@@ -170,6 +195,12 @@
                                 <Style.Triggers><DataTrigger Binding="{Binding IsEmpty}" Value="True"><Setter Property="Visibility" Value="Visible" /></DataTrigger></Style.Triggers>
                             </Style></TextBlock.Style>
                         </TextBlock>
+                        <StackPanel Grid.Row="1" Orientation="Horizontal" HorizontalAlignment="Center" Margin="0,8,0,0">
+                            <Button Content="이전" Command="{Binding PreviousPageCommand}" AutomationProperties.AutomationId="PreviousEquipmentPage" />
+                            <TextBlock Text="{Binding EquipmentPageLabel}" Foreground="{DynamicResource MutedInk}"
+                                       VerticalAlignment="Center" Margin="12,0" AutomationProperties.AutomationId="EquipmentPageLabel" />
+                            <Button Content="다음" Command="{Binding NextPageCommand}" AutomationProperties.AutomationId="NextEquipmentPage" />
+                        </StackPanel>
                     </Grid>
                 </Grid>
             </Border>
@@ -235,9 +266,22 @@
                             <Grid Margin="0,20,0,8">
                                 <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
                                 <TextBlock Text="대여 이력" FontSize="16" FontWeight="SemiBold" VerticalAlignment="Center" />
-                                <TextBlock Grid.Column="1" Text="불러오는 중…" FontSize="13" Foreground="{DynamicResource MutedInk}"
-                                           Visibility="{Binding IsLoadingHistory, Converter={StaticResource BooleanToVisibility}}" />
+                                <StackPanel Grid.Column="1" Orientation="Horizontal">
+                                    <TextBlock Text="{Binding HistoryPageLabel}" FontSize="13" Foreground="{DynamicResource MutedInk}"
+                                               VerticalAlignment="Center" AutomationProperties.AutomationId="HistoryPageLabel" />
+                                    <TextBlock Text="불러오는 중…" FontSize="13" Foreground="{DynamicResource MutedInk}" Margin="8,0,0,0"
+                                               Visibility="{Binding IsLoadingHistory, Converter={StaticResource BooleanToVisibility}}" />
+                                </StackPanel>
                             </Grid>
+                            <TextBlock Text="{Binding HistoryCacheNotice}" Foreground="{DynamicResource {x:Static SystemColors.InfoTextBrushKey}}"
+                                       TextWrapping="Wrap" Margin="0,0,0,8">
+                                <TextBlock.Style><Style TargetType="TextBlock"><Setter Property="Visibility" Value="Collapsed" />
+                                    <Style.Triggers><DataTrigger Binding="{Binding HistoryCacheNotice}" Value=""><Setter Property="Visibility" Value="Collapsed" /></DataTrigger>
+                                        <DataTrigger Binding="{Binding HistoryCacheNotice}" Value="{x:Null}"><Setter Property="Visibility" Value="Collapsed" /></DataTrigger>
+                                        <DataTrigger Binding="{Binding IsShowingCachedHistory}" Value="True"><Setter Property="Visibility" Value="Visible" /></DataTrigger>
+                                    </Style.Triggers>
+                                </Style></TextBlock.Style>
+                            </TextBlock>
                             <TextBlock Text="이력을 불러오지 못했습니다."
                                        Foreground="{DynamicResource {x:Static SystemColors.InfoTextBrushKey}}"
                                        Visibility="{Binding HasHistoryError, Converter={StaticResource BooleanToVisibility}}" />
@@ -280,6 +324,12 @@
                                     </DataTemplate>
                                 </ItemsControl.ItemTemplate>
                             </ItemsControl>
+                            <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" Margin="0,4,0,0">
+                                <Button Content="이전 이력" Command="{Binding PreviousHistoryPageCommand}"
+                                        AutomationProperties.AutomationId="PreviousHistoryPage" />
+                                <Button Content="다음 이력" Command="{Binding NextHistoryPageCommand}" Margin="8,0,0,0"
+                                        AutomationProperties.AutomationId="NextHistoryPage" />
+                            </StackPanel>
                         </StackPanel>
                     </ScrollViewer>
 

@@ -1,4 +1,5 @@
 using System.Net.Http;
+using System.IO.Compression;
 using System.Runtime.Serialization.Json;
 using System.Text;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
@@ -17,6 +18,7 @@ public sealed class LendingViewModelTests
         Assert.AreEqual(5, rig.ViewModel.VisibleItems.Count);
 
         rig.ViewModel.SearchText = "eq-1004";
+        await WaitUntilAsync(() => rig.ViewModel.VisibleItems.Count == 1 && !rig.ViewModel.IsLoading);
         Assert.AreEqual(1, rig.ViewModel.VisibleItems.Count);
         rig.ViewModel.SelectedItem = rig.ViewModel.VisibleItems[0];
         Assert.IsTrue(rig.ViewModel.HasActiveLoan);
@@ -25,8 +27,150 @@ public sealed class LendingViewModelTests
         Assert.IsFalse(rig.ViewModel.IsDirty);
 
         rig.ViewModel.SearchText = "missing";
+        await WaitUntilAsync(() => rig.ViewModel.IsEmpty && !rig.ViewModel.IsLoading);
         Assert.IsFalse(rig.ViewModel.HasSelection);
         Assert.IsTrue(rig.ViewModel.IsEmpty);
+    }
+
+    [TestMethod]
+    public async Task EquipmentPagesStayBoundedAndChangingPageClearsOffPageSelection()
+    {
+        using var rig = new TestRig();
+        rig.Api.Items.AddRange(Enumerable.Range(0, 60).Select(index => new EquipmentItem
+        {
+            Id = 2000 + index, Code = "EQ-X" + index, Name = "Device " + index,
+            Category = "Equipment", Status = EquipmentStates.Available, Version = 1
+        }));
+        await rig.ViewModel.InitializeAsync();
+
+        Assert.AreEqual(65, rig.ViewModel.EquipmentTotalCount);
+        Assert.AreEqual(50, rig.ViewModel.VisibleItems.Count);
+        rig.ViewModel.SelectedItem = rig.ViewModel.VisibleItems[0];
+        rig.ViewModel.NextPageCommand.Execute(null);
+        await WaitUntilAsync(() => rig.ViewModel.EquipmentPage == 2 && !rig.ViewModel.IsLoading);
+
+        Assert.AreEqual(15, rig.ViewModel.VisibleItems.Count);
+        Assert.IsFalse(rig.ViewModel.HasSelection);
+        Assert.AreEqual("2 / 2 페이지 · 65개", rig.ViewModel.EquipmentPageLabel);
+    }
+
+    [TestMethod]
+    public async Task SearchDebounceCancelsOlderReadAndIgnoresItsLateResponse()
+    {
+        using var rig = new TestRig();
+        await rig.ViewModel.InitializeAsync();
+        var requests = new List<(CancellationToken Token, TaskCompletionSource<EquipmentListResponse> Response)>();
+        rig.Api.EquipmentResponse = (_, _, _, _, token) =>
+        {
+            var response = new TaskCompletionSource<EquipmentListResponse>(TaskCreationOptions.RunContinuationsAsynchronously);
+            requests.Add((token, response));
+            return response.Task;
+        };
+
+        rig.ViewModel.SearchText = "stale";
+        await WaitUntilAsync(() => requests.Count == 1);
+        rig.ViewModel.SearchText = "latest";
+        await WaitUntilAsync(() => requests.Count == 2);
+        Assert.IsTrue(requests[0].Token.IsCancellationRequested);
+
+        requests[1].Response.SetResult(PageResponse(rig.Api.DatasetId, new EquipmentItem
+        {
+            Id = 1002, Code = "EQ-1002", Name = "Latest", Category = "Equipment",
+            Status = EquipmentStates.Available, Version = 1
+        }));
+        await WaitUntilAsync(() => !rig.ViewModel.IsLoading && rig.ViewModel.VisibleItems.Count == 1);
+        requests[0].Response.SetResult(PageResponse(rig.Api.DatasetId, new EquipmentItem
+        {
+            Id = 1001, Code = "EQ-1001", Name = "Stale", Category = "Equipment",
+            Status = EquipmentStates.Available, Version = 1
+        }));
+        await Task.Delay(20);
+
+        Assert.AreEqual(1002, rig.ViewModel.VisibleItems.Single().Id);
+        Assert.IsFalse(rig.ViewModel.IsLoading);
+    }
+
+    [TestMethod]
+    public async Task HistoryPagingLoadsOnlyRequestedPage()
+    {
+        using var rig = new TestRig();
+        await rig.ViewModel.InitializeAsync();
+        rig.Api.HistoryResponse = _ => Task.FromResult<IReadOnlyList<LoanHistoryEntry>>(
+            Enumerable.Range(1, 120).Select(index => new LoanHistoryEntry { Id = "event-" + index }).ToArray());
+        rig.ViewModel.SelectedItem = rig.ViewModel.VisibleItems.Single(x => x.Id == 1001);
+        await WaitUntilAsync(() => !rig.ViewModel.IsLoadingHistory && rig.ViewModel.History.Count == 50);
+
+        rig.ViewModel.NextHistoryPageCommand.Execute(null);
+        await WaitUntilAsync(() => rig.ViewModel.HistoryPage == 2 && !rig.ViewModel.IsLoadingHistory);
+
+        Assert.AreEqual(120, rig.ViewModel.HistoryTotalCount);
+        Assert.AreEqual(50, rig.ViewModel.History.Count);
+        Assert.AreEqual("event-51", rig.ViewModel.History[0].Id);
+    }
+
+    [TestMethod]
+    public async Task OfflineModeUsesSavedEquipmentAndHistoryAndFiltersCachedScopeLocally()
+    {
+        var directory = Path.Combine(Path.GetTempPath(), "wpf-demo-read-cache-vm-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(directory);
+        try
+        {
+            using var cache = new ReadCacheStore(Path.Combine(directory, "read-cache.db"));
+            using var rig = new TestRig(cache);
+            rig.Api.HistoryResponse = _ => Task.FromResult<IReadOnlyList<LoanHistoryEntry>>(
+                new[] { new LoanHistoryEntry { Id = "cached-event", Kind = "Borrowed", Note = "" } });
+            await rig.ViewModel.InitializeAsync();
+            rig.ViewModel.SelectedItem = rig.ViewModel.VisibleItems.Single(x => x.Id == 1001);
+            await WaitUntilAsync(() => !rig.ViewModel.IsLoadingHistory && rig.ViewModel.History.Count == 1);
+
+            rig.Api.FailLoad = true;
+            await rig.ViewModel.RefreshAsync();
+
+            Assert.IsTrue(rig.ViewModel.IsOffline);
+            Assert.IsTrue(rig.ViewModel.IsShowingCachedData);
+            Assert.IsTrue(rig.ViewModel.IsShowingCachedHistory);
+            Assert.AreEqual("cached-event", rig.ViewModel.History.Single().Id);
+            Assert.IsFalse(rig.ViewModel.CanBorrow);
+            StringAssert.Contains(rig.ViewModel.CacheNotice, "저장된 5개");
+            var requestCountBeforeCachedSearch = rig.Api.EquipmentRequests.Count;
+
+            rig.ViewModel.SearchText = "EQ-1004";
+            await WaitUntilAsync(() => !rig.ViewModel.IsLoading && rig.ViewModel.VisibleItems.Count == 1);
+
+            Assert.AreEqual(1004, rig.ViewModel.VisibleItems.Single().Id);
+            Assert.AreEqual(requestCountBeforeCachedSearch, rig.Api.EquipmentRequests.Count,
+                "Offline search should use the saved read cache without another API request.");
+            Assert.IsTrue(rig.ViewModel.IsOffline);
+        }
+        finally { Directory.Delete(directory, recursive: true); }
+    }
+
+    [TestMethod]
+    public async Task DiagnosticsExportStillCreatesLocalBundleWhenApiIsUnavailable()
+    {
+        var outputDirectory = Path.Combine(Path.GetTempPath(), "wpf-demo-vm-diagnostics-" + Guid.NewGuid().ToString("N"));
+        var requestLog = new MemoryRequestLog();
+        requestLog.Record(new ClientDiagnosticEvent
+        {
+            RequestId = Guid.NewGuid().ToString("D"), Operation = "equipment-list",
+            StatusCode = 200, ElapsedMilliseconds = 8, Result = "success"
+        });
+        try
+        {
+            using var rig = new TestRig(requestLog: requestLog, diagnosticsOutputDirectory: outputDirectory,
+                dpiProvider: () => 144.0);
+            await rig.ViewModel.InitializeAsync();
+            rig.Api.FailDiagnostics = true;
+
+            await rig.ViewModel.ExportDiagnosticsAsync();
+
+            var path = Directory.GetFiles(outputDirectory, "wpf-demo-diagnostics-*.zip").Single();
+            StringAssert.Contains(rig.ViewModel.DiagnosticsMessage, "서버 기록은 연결할 수 없어 포함하지 못했습니다.");
+            using var archive = ZipFile.OpenRead(path);
+            using var reader = new StreamReader(archive.GetEntry("server-requests.json").Open());
+            StringAssert.Contains(reader.ReadToEnd(), "\"isAvailable\":false");
+        }
+        finally { if (Directory.Exists(outputDirectory)) Directory.Delete(outputDirectory, recursive: true); }
     }
 
     [TestMethod]
@@ -149,6 +293,7 @@ public sealed class LendingViewModelTests
         using var rig = new TestRig();
         await rig.ViewModel.InitializeAsync();
         rig.ViewModel.StatusFilter = EquipmentStates.Available;
+        await WaitUntilAsync(() => !rig.ViewModel.IsLoading && rig.ViewModel.EquipmentTotalCount == 3);
         rig.ViewModel.SelectedItem = rig.ViewModel.VisibleItems.Single(x => x.Id == 1001);
 
         await rig.ViewModel.BorrowAsync();
@@ -372,6 +517,23 @@ public sealed class LendingViewModelTests
         return Encoding.UTF8.GetString(stream.ToArray());
     }
 
+    private static EquipmentListResponse PageResponse(string datasetId, EquipmentItem item) => new()
+    {
+        DatasetId = datasetId,
+        Items = new List<EquipmentItem> { item },
+        Borrowers = new List<Borrower> { new() { Id = "A", DisplayName = "Borrower A" } },
+        TotalCount = 1,
+        Page = 1,
+        PageSize = 50
+    };
+
+    private static async Task WaitUntilAsync(Func<bool> condition)
+    {
+        for (var attempt = 0; attempt < 200 && !condition(); attempt++)
+            await Task.Delay(10);
+        Assert.IsTrue(condition(), "The expected asynchronous view-model state was not reached.");
+    }
+
     private sealed class TestRig : IDisposable
     {
         private readonly string _directory = Path.Combine(Path.GetTempPath(), "wpf-demo-client-test-" + Guid.NewGuid().ToString("N"));
@@ -379,12 +541,14 @@ public sealed class LendingViewModelTests
         public PendingOperationStore Store { get; }
         public LendingViewModel ViewModel { get; }
 
-        public TestRig()
+        public TestRig(IReadCacheStore readCache = null, IClientRequestLog requestLog = null,
+            string diagnosticsOutputDirectory = null, Func<double> dpiProvider = null)
         {
             Directory.CreateDirectory(_directory);
             Api = new FakeApi();
             Store = new PendingOperationStore(_directory);
-            ViewModel = new LendingViewModel(Api, Store, "http://127.0.0.1:5187", "A");
+            ViewModel = new LendingViewModel(Api, Store, "http://127.0.0.1:5187", "A", readCache,
+                requestLog, dpiProvider, diagnosticsOutputDirectory);
         }
 
         public void Dispose()
@@ -418,14 +582,25 @@ public sealed class LendingViewModelTests
         public void Dispose() { Entered.Dispose(); Release.Dispose(); }
     }
 
+    private sealed class MemoryRequestLog : IClientRequestLog
+    {
+        private readonly List<ClientDiagnosticEvent> _events = new();
+        public void Record(ClientDiagnosticEvent item) => _events.Add(item);
+        public IReadOnlyList<ClientDiagnosticEvent> GetRecent() => _events.ToArray();
+    }
+
     private sealed class FakeApi : ILendingApi
     {
         private readonly string _datasetId = Guid.NewGuid().ToString("D");
         private readonly List<LoanHistoryEntry> _history = new();
         public bool FailLoad { get; set; }
+        public bool FailDiagnostics { get; set; }
         public Exception FailAfterCommitNext { get; set; }
         public Func<PendingOperation, Task> BeforeSend { get; set; }
         public Func<int, Task<IReadOnlyList<LoanHistoryEntry>>> HistoryResponse { get; set; }
+        public Func<string, string, int, int, CancellationToken, Task<EquipmentListResponse>> EquipmentResponse { get; set; }
+        public List<(string Query, string Status, int Page, CancellationToken Token)> EquipmentRequests { get; } = new();
+        public string DatasetId => _datasetId;
         public TaskCompletionSource<object> SendGate { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
         public List<PendingOperation> SentOperations { get; } = new();
         private readonly Dictionary<string, LoanOperationResponse> _receipts = new();
@@ -440,19 +615,56 @@ public sealed class LendingViewModelTests
 
         public Task<EquipmentListResponse> GetEquipmentAsync()
         {
+            return GetEquipmentAsync("", EquipmentStates.All, 1, 50, CancellationToken.None);
+        }
+
+        public Task<DiagnosticsResponse> GetDiagnosticsAsync(CancellationToken cancellationToken)
+        {
+            if (FailDiagnostics) throw new HttpRequestException("diagnostics endpoint unavailable");
+            return Task.FromResult(new DiagnosticsResponse { IsPartial = true, Events = new List<RequestDiagnosticEvent>() });
+        }
+
+        public Task<EquipmentListResponse> GetEquipmentAsync(string query, string status, int page, int pageSize,
+            CancellationToken cancellationToken)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            EquipmentRequests.Add((query, status, page, cancellationToken));
+            if (EquipmentResponse != null) return EquipmentResponse(query, status, page, pageSize, cancellationToken);
             if (FailLoad) throw new HttpRequestException("connection unavailable");
+            var normalizedQuery = (query ?? "").Trim();
+            var matching = Items.Where(item =>
+                (status == EquipmentStates.All || item.Status == status) &&
+                (normalizedQuery.Length == 0 || item.Code.IndexOf(normalizedQuery, StringComparison.OrdinalIgnoreCase) >= 0 ||
+                 item.Name.IndexOf(normalizedQuery, StringComparison.OrdinalIgnoreCase) >= 0 ||
+                 item.Category.IndexOf(normalizedQuery, StringComparison.OrdinalIgnoreCase) >= 0)).ToList();
             return Task.FromResult(new EquipmentListResponse
             {
                 DatasetId = _datasetId,
-                Items = Items.Select(Clone).ToList(),
-                Borrowers = new List<Borrower> { new() { Id = "A", DisplayName = "Borrower A" }, new() { Id = "B", DisplayName = "Borrower B" } }
+                Items = matching.Skip((page - 1) * pageSize).Take(pageSize).Select(Clone).ToList(),
+                Borrowers = new List<Borrower> { new() { Id = "A", DisplayName = "Borrower A" }, new() { Id = "B", DisplayName = "Borrower B" } },
+                TotalCount = matching.Count, Page = page, PageSize = pageSize
             });
         }
 
-        public Task<IReadOnlyList<LoanHistoryEntry>> GetHistoryAsync(int equipmentId)
+        public async Task<IReadOnlyList<LoanHistoryEntry>> GetHistoryAsync(int equipmentId)
         {
-            if (HistoryResponse != null) return HistoryResponse(equipmentId);
-            return Task.FromResult<IReadOnlyList<LoanHistoryEntry>>(_history.Where(x => x.OperationId != null).Select(Clone).ToArray());
+            var response = await GetHistoryAsync(equipmentId, 1, 50, CancellationToken.None);
+            return response.Items;
+        }
+
+        public async Task<LoanHistoryListResponse> GetHistoryAsync(int equipmentId, int page, int pageSize,
+            CancellationToken cancellationToken)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            var history = HistoryResponse != null
+                ? await HistoryResponse(equipmentId)
+                : _history.Where(x => x.OperationId != null).Select(Clone).ToArray();
+            cancellationToken.ThrowIfCancellationRequested();
+            return new LoanHistoryListResponse
+            {
+                Items = history.Skip((page - 1) * pageSize).Take(pageSize).Select(Clone).ToList(),
+                TotalCount = history.Count, Page = page, PageSize = pageSize
+            };
         }
 
         public async Task<LoanOperationResponse> SendOperationAsync(PendingOperation operation)

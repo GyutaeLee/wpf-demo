@@ -11,32 +11,57 @@ builder.Services.Configure<JsonOptions>(options => options.SerializerOptions.Pro
 var dataDirectory = builder.Configuration["WPFDEMO_SERVER_DATA_DIR"];
 if (string.IsNullOrWhiteSpace(dataDirectory))
     dataDirectory = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "wpf-demo", "server");
-var store = new LendingStore(dataDirectory);
+var dataProfile = builder.Configuration["WPFDEMO_DATASET_PROFILE"];
+var store = new LendingStore(dataDirectory, dataProfile);
 var dropNextBorrowResponse = string.Equals(builder.Configuration["WPFDEMO_DEMO_DROP_NEXT_BORROW_RESPONSE"], "true", StringComparison.OrdinalIgnoreCase);
 var faultUsed = 0;
+var diagnostics = new RecentApiDiagnostics();
 var app = builder.Build();
 
 app.Use(async (context, next) =>
 {
+    var requestId = ResolveRequestId(context.Request.Headers["X-Request-ID"].ToString());
+    context.Response.Headers["X-Request-ID"] = requestId;
     var watch = Stopwatch.StartNew();
     try { await next(); }
     finally
     {
+        diagnostics.Record(new RequestDiagnosticEvent
+        {
+            RequestId = requestId,
+            OccurredAtUtc = DateTime.UtcNow.ToString("O", System.Globalization.CultureInfo.InvariantCulture),
+            Method = context.Request.Method,
+            Route = context.GetEndpoint()?.DisplayName ?? "unmatched",
+            StatusCode = context.Response.StatusCode,
+            ElapsedMilliseconds = watch.ElapsedMilliseconds
+        });
         if (context.Request.Path.Value?.EndsWith("/borrow", StringComparison.Ordinal) == true ||
             context.Request.Path.Value?.EndsWith("/return", StringComparison.Ordinal) == true)
-            app.Logger.LogInformation("Operation {OperationId} finished with {StatusCode} in {ElapsedMilliseconds} ms",
-                context.Request.Headers["Idempotency-Key"].ToString(), context.Response.StatusCode, watch.ElapsedMilliseconds);
+            app.Logger.LogInformation("Request {RequestId} finished with {StatusCode} in {ElapsedMilliseconds} ms; operation {OperationId}",
+                requestId, context.Response.StatusCode, watch.ElapsedMilliseconds,
+                context.Request.Headers["Idempotency-Key"].ToString());
     }
 });
 
-app.MapGet("/api/equipment", () => Results.Ok(store.GetEquipment()));
+app.MapGet("/api/diagnostics/recent", () => Results.Ok(diagnostics.GetRecent()));
+app.MapGet("/api/equipment", (HttpRequest request) =>
+{
+    if (!TryReadPage(request, out var page, out var pageSize) || !ValidStatus(request.Query["status"].ToString()))
+        return Results.Json(new ApiErrorResponse { Code = "InvalidQuery", Message = "조회 조건이 올바르지 않습니다." }, statusCode: 400);
+    return Results.Ok(store.GetEquipment(request.Query["q"].ToString(), request.Query["status"].ToString(), page, pageSize));
+});
 app.MapGet("/api/equipment/{id:int}", (int id) =>
 {
-    var item = store.GetEquipment().Items.FirstOrDefault(x => x.Id == id);
+    var item = store.GetEquipment(id);
     return item == null ? Results.NotFound() : Results.Ok(item);
 });
 app.MapGet("/api/borrowers", () => Results.Ok(store.GetBorrowers()));
-app.MapGet("/api/equipment/{id:int}/history", (int id) => Results.Ok(store.GetHistory(id)));
+app.MapGet("/api/equipment/{id:int}/history", (int id, HttpRequest request) =>
+{
+    if (!TryReadPage(request, out var page, out var pageSize))
+        return Results.Json(new ApiErrorResponse { Code = "InvalidQuery", Message = "조회 조건이 올바르지 않습니다." }, statusCode: 400);
+    return Results.Ok(store.GetHistory(id, page, pageSize));
+});
 app.MapPost("/api/equipment/{id:int}/borrow", async (int id, HttpContext context) =>
 {
     var request = await ReadCommand<BorrowCommand>(context.Request);
@@ -109,5 +134,23 @@ static bool ValidNote(string note) => note == null || (note.Length <= 200 && (no
 
 static bool ValidIdentity(string operationId, string datasetId, long expectedVersion) =>
     Guid.TryParse(operationId, out _) && Guid.TryParse(datasetId, out _) && expectedVersion > 0;
+
+static string ResolveRequestId(string value) => Guid.TryParse(value, out var requestId)
+    ? requestId.ToString("D") : Guid.NewGuid().ToString("D");
+
+static bool TryReadPage(HttpRequest request, out int page, out int pageSize)
+{
+    page = 1;
+    pageSize = 50;
+    var rawPage = request.Query["page"].ToString();
+    var rawSize = request.Query["pageSize"].ToString();
+    if (rawPage.Length > 0 && (!int.TryParse(rawPage, out page) || page < 1)) return false;
+    if (rawSize.Length > 0 && (!int.TryParse(rawSize, out pageSize) || pageSize < 1)) return false;
+    pageSize = Math.Min(pageSize, 100);
+    return true;
+}
+
+static bool ValidStatus(string status) => string.IsNullOrEmpty(status) || status == EquipmentStates.All ||
+    status == EquipmentStates.Available || status == EquipmentStates.OnLoan || status == EquipmentStates.Maintenance;
 
 public partial class Program { }

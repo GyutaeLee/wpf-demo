@@ -29,6 +29,119 @@ public sealed class ApiIntegrationTests
     }
 
     [TestMethod]
+    public async Task LargeProfileCreatesDeterministicEquipmentAndHistoryOnlyForANewDatabase()
+    {
+        var directory = Path.Combine(Path.GetTempPath(), "wpf-demo-large-test-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(directory);
+        try
+        {
+            string datasetId;
+            using (var first = new TestApiHost(directory, "Large"))
+            {
+                var catalog = await first.GetCatalogAsync();
+                datasetId = catalog.DatasetId;
+                Assert.AreEqual(10000, catalog.TotalCount);
+                Assert.AreEqual(50, catalog.Items.Count);
+                var lastPage = await first.Client.GetFromJsonAsync<EquipmentListResponse>("/api/equipment?page=100&pageSize=100");
+                Assert.AreEqual("EQ-11000", lastPage.Items[^1].Code);
+                var history = await first.Client.GetFromJsonAsync<LoanHistoryListResponse>("/api/equipment/1001/history?page=1&pageSize=100");
+                Assert.AreEqual(20000, history.TotalCount);
+                Assert.AreEqual(100, history.Items.Count);
+            }
+
+            using (var restarted = new TestApiHost(directory, "Large"))
+            {
+                var catalog = await restarted.GetCatalogAsync();
+                Assert.AreEqual(datasetId, catalog.DatasetId);
+                Assert.AreEqual(10000, catalog.TotalCount);
+                Assert.AreEqual(20000, (await restarted.Client.GetFromJsonAsync<LoanHistoryListResponse>("/api/equipment/1001/history")).TotalCount);
+            }
+        }
+        finally { Directory.Delete(directory, recursive: true); }
+    }
+
+    [TestMethod]
+    public async Task LargeProfileOnLoanEquipmentHasActiveLoansAndCanBeReturned()
+    {
+        using var host = new TestApiHost(profile: "Large");
+        EquipmentListResponse firstPage = null;
+        for (var page = 1; ; page++)
+        {
+            var catalog = await host.Client.GetFromJsonAsync<EquipmentListResponse>(
+                "/api/equipment?status=" + Uri.EscapeDataString(EquipmentStates.OnLoan) + "&page=" + page + "&pageSize=100");
+            firstPage ??= catalog;
+            Assert.IsTrue(catalog.Items.All(item => item.ActiveLoan != null),
+                "Every on-loan equipment item must identify the loan that can be returned.");
+            if (page * catalog.PageSize >= catalog.TotalCount) break;
+        }
+
+        var item = firstPage.Items.Single(x => x.Id == 1021);
+        var before = await host.Client.GetFromJsonAsync<LoanHistoryListResponse>("/api/equipment/1021/history");
+        Assert.AreEqual(1, before.TotalCount);
+        Assert.AreEqual(item.ActiveLoan.Id, before.Items.Single().LoanId);
+        Assert.AreEqual("Borrowed", before.Items.Single().Kind);
+
+        using var response = await host.SendReturnAsync(firstPage, item.Id, Guid.NewGuid().ToString("D"));
+        Assert.AreEqual(HttpStatusCode.OK, response.StatusCode);
+        var latest = await host.Client.GetFromJsonAsync<EquipmentItem>("/api/equipment/1021");
+        Assert.AreEqual(EquipmentStates.Available, latest.Status);
+        Assert.IsNull(latest.ActiveLoan);
+        var after = await host.Client.GetFromJsonAsync<LoanHistoryListResponse>("/api/equipment/1021/history");
+        Assert.AreEqual(2, after.TotalCount);
+        Assert.AreEqual(1, after.Items.Count(entry => entry.Kind == "Returned" && entry.LoanId == item.ActiveLoan.Id));
+    }
+
+    [TestMethod]
+    public async Task EquipmentQueryFiltersOnServerAndReturnsStableBoundedPages()
+    {
+        using var host = new TestApiHost();
+        var first = await host.Client.GetFromJsonAsync<EquipmentListResponse>(
+            "/api/equipment?q=eq-100&status=%EC%82%AC%EC%9A%A9%20%EA%B0%80%EB%8A%A5&page=1&pageSize=2");
+        var second = await host.Client.GetFromJsonAsync<EquipmentListResponse>(
+            "/api/equipment?q=eq-100&status=%EC%82%AC%EC%9A%A9%20%EA%B0%80%EB%8A%A5&page=2&pageSize=2");
+
+        Assert.AreEqual(3, first.TotalCount);
+        Assert.AreEqual(2, first.Items.Count);
+        CollectionAssert.AreEqual(new[] { 1001, 1002 }, first.Items.Select(x => x.Id).ToArray());
+        Assert.AreEqual(1, second.Items.Count);
+        Assert.AreEqual(1003, second.Items[0].Id);
+
+        var capped = await host.Client.GetFromJsonAsync<EquipmentListResponse>("/api/equipment?pageSize=500");
+        Assert.AreEqual(100, capped.PageSize);
+        Assert.AreEqual(5, capped.TotalCount);
+        Assert.AreEqual(5, capped.Items.Count);
+
+        using var badPage = await host.Client.GetAsync("/api/equipment?page=0");
+        using var badStatus = await host.Client.GetAsync("/api/equipment?status=unknown");
+        Assert.AreEqual(HttpStatusCode.BadRequest, badPage.StatusCode);
+        Assert.AreEqual(HttpStatusCode.BadRequest, badStatus.StatusCode);
+    }
+
+    [TestMethod]
+    public async Task DiagnosticsExposeOnlyTheLastHundredRequestMetadataEvents()
+    {
+        using var host = new TestApiHost();
+        var requestIds = new List<string>();
+        for (var index = 0; index < 105; index++)
+        {
+            var requestId = Guid.NewGuid().ToString("D");
+            requestIds.Add(requestId);
+            using var request = new HttpRequestMessage(HttpMethod.Get, "/api/equipment?q=private-search-text");
+            request.Headers.Add("X-Request-ID", requestId);
+            using var response = await host.Client.SendAsync(request);
+            Assert.AreEqual(requestId, response.Headers.GetValues("X-Request-ID").Single());
+        }
+
+        var diagnostics = await host.Client.GetFromJsonAsync<DiagnosticsResponse>("/api/diagnostics/recent");
+        Assert.IsTrue(diagnostics.IsPartial);
+        Assert.IsTrue(DateTime.TryParse(diagnostics.ServerStartedAtUtc, out _));
+        Assert.AreEqual(100, diagnostics.Events.Count);
+        Assert.IsTrue(diagnostics.Events.All(item => Guid.TryParse(item.RequestId, out _) && item.StatusCode == 200));
+        Assert.IsFalse(diagnostics.Events.Any(item => item.Route.Contains("private-search-text", StringComparison.Ordinal)));
+        Assert.IsTrue(diagnostics.Events.Any(item => item.RequestId == requestIds[^1]));
+    }
+
+    [TestMethod]
     public async Task ClientWireEncodingSupportsBorrowReplayConflictAndReturn()
     {
         using var host = new TestApiHost();
@@ -132,10 +245,10 @@ public sealed class ApiIntegrationTests
         Assert.AreEqual(EquipmentStates.Available, returnResult.Equipment.Status);
         Assert.AreEqual(3L, returnResult.Equipment.Version);
 
-        var history = await host.Client.GetFromJsonAsync<LoanHistoryEntry[]>("/api/equipment/1001/history");
-        Assert.AreEqual(2, history.Length);
-        Assert.AreEqual(1, history.Count(x => x.Kind == "Borrowed"));
-        Assert.AreEqual(1, history.Count(x => x.Kind == "Returned"));
+        var history = await host.Client.GetFromJsonAsync<LoanHistoryListResponse>("/api/equipment/1001/history");
+        Assert.AreEqual(2, history.TotalCount);
+        Assert.AreEqual(1, history.Items.Count(x => x.Kind == "Borrowed"));
+        Assert.AreEqual(1, history.Items.Count(x => x.Kind == "Returned"));
     }
 
     [TestMethod]
@@ -164,9 +277,9 @@ public sealed class ApiIntegrationTests
         var item = current.Items.Single(x => x.Id == 1001);
         Assert.AreEqual(EquipmentStates.OnLoan, item.Status);
         Assert.IsNotNull(item.ActiveLoan);
-        var history = await host.Client.GetFromJsonAsync<LoanHistoryEntry[]>("/api/equipment/1001/history");
-        Assert.AreEqual(1, history.Length);
-        Assert.AreEqual(1, history.Count(x => x.Kind == "Borrowed"));
+        var history = await host.Client.GetFromJsonAsync<LoanHistoryListResponse>("/api/equipment/1001/history");
+        Assert.AreEqual(1, history.TotalCount);
+        Assert.AreEqual(1, history.Items.Count(x => x.Kind == "Borrowed"));
     }
 
     [TestMethod]
@@ -186,8 +299,8 @@ public sealed class ApiIntegrationTests
         var current = await host.GetCatalogAsync();
         Assert.AreEqual(2L, current.Items.Single(x => x.Id == 1001).Version);
         Assert.AreEqual(original.LoanId, current.Items.Single(x => x.Id == 1001).ActiveLoan.Id);
-        var history = await host.Client.GetFromJsonAsync<LoanHistoryEntry[]>("/api/equipment/1001/history");
-        Assert.AreEqual(1, history.Length);
+        var history = await host.Client.GetFromJsonAsync<LoanHistoryListResponse>("/api/equipment/1001/history");
+        Assert.AreEqual(1, history.TotalCount);
     }
 
     [TestMethod]
@@ -203,8 +316,8 @@ public sealed class ApiIntegrationTests
         Assert.AreEqual("IdempotencyKeyReused", error.Code);
         var current = await host.GetCatalogAsync();
         Assert.AreEqual(2L, current.Items.Single(x => x.Id == 1001).Version);
-        var history = await host.Client.GetFromJsonAsync<LoanHistoryEntry[]>("/api/equipment/1001/history");
-        Assert.AreEqual(1, history.Length);
+        var history = await host.Client.GetFromJsonAsync<LoanHistoryListResponse>("/api/equipment/1001/history");
+        Assert.AreEqual(1, history.TotalCount);
     }
 
     [TestMethod]
@@ -222,7 +335,7 @@ public sealed class ApiIntegrationTests
         Assert.AreEqual(HttpStatusCode.OK, accepted.StatusCode);
         var current = await host.GetCatalogAsync();
         Assert.AreEqual(EquipmentStates.OnLoan, current.Items.Single(x => x.Id == 1001).Status);
-        Assert.AreEqual(1, (await host.Client.GetFromJsonAsync<LoanHistoryEntry[]>("/api/equipment/1001/history")).Length);
+        Assert.AreEqual(1, (await host.Client.GetFromJsonAsync<LoanHistoryListResponse>("/api/equipment/1001/history")).TotalCount);
     }
 
     [TestMethod]
@@ -248,7 +361,7 @@ public sealed class ApiIntegrationTests
         Assert.AreNotEqual(originalReceipt.LoanId, current.ActiveLoan.Id);
         Assert.AreEqual(EquipmentStates.OnLoan, current.Status);
         Assert.AreEqual(4L, current.Version);
-        Assert.AreEqual(3, (await host.Client.GetFromJsonAsync<LoanHistoryEntry[]>("/api/equipment/1001/history")).Length);
+        Assert.AreEqual(3, (await host.Client.GetFromJsonAsync<LoanHistoryListResponse>("/api/equipment/1001/history")).TotalCount);
     }
 
     [TestMethod]
@@ -275,7 +388,7 @@ public sealed class ApiIntegrationTests
                 Assert.AreEqual(EquipmentStates.OnLoan, afterRestart.Items.Single(x => x.Id == 1001).Status);
                 using var replay = await restarted.SendBorrowAsync(catalog, 1001, operationId);
                 Assert.AreEqual(HttpStatusCode.OK, replay.StatusCode);
-                Assert.AreEqual(1, (await restarted.Client.GetFromJsonAsync<LoanHistoryEntry[]>("/api/equipment/1001/history")).Length);
+                Assert.AreEqual(1, (await restarted.Client.GetFromJsonAsync<LoanHistoryListResponse>("/api/equipment/1001/history")).TotalCount);
                 Assert.AreEqual(2L, (await restarted.GetCatalogAsync()).Items.Single(x => x.Id == 1001).Version);
             }
         }
@@ -301,7 +414,7 @@ public sealed class ApiIntegrationTests
         var unchanged = await host.GetCatalogAsync();
         Assert.AreEqual(EquipmentStates.Available, unchanged.Items.Single(x => x.Id == 1001).Status);
         Assert.AreEqual(1L, unchanged.Items.Single(x => x.Id == 1001).Version);
-        Assert.AreEqual(0, (await host.Client.GetFromJsonAsync<LoanHistoryEntry[]>("/api/equipment/1001/history")).Length);
+        Assert.AreEqual(0, (await host.Client.GetFromJsonAsync<LoanHistoryListResponse>("/api/equipment/1001/history")).TotalCount);
 
         using (var connection = new SqliteConnection("Data Source=" + host.DatabasePath))
         {
@@ -352,17 +465,20 @@ public sealed class ApiIntegrationTests
         private readonly bool _ownsDirectory;
         private readonly TestFactory _factory;
         private readonly string _previousDataDirectory;
+        private readonly string _previousDataProfile;
         public HttpClient Client { get; }
         public string DatabasePath => Path.Combine(_directory, "wpf-demo.db");
 
-        public TestApiHost(string directory = null)
+        public TestApiHost(string directory = null, string profile = null)
         {
             _ownsDirectory = directory == null;
             _directory = directory ?? Path.Combine(Path.GetTempPath(), "wpf-demo-test-" + Guid.NewGuid().ToString("N"));
             Directory.CreateDirectory(_directory);
             _previousDataDirectory = Environment.GetEnvironmentVariable("WPFDEMO_SERVER_DATA_DIR");
+            _previousDataProfile = Environment.GetEnvironmentVariable("WPFDEMO_DATASET_PROFILE");
             Environment.SetEnvironmentVariable("WPFDEMO_SERVER_DATA_DIR", _directory);
-            _factory = new TestFactory(_directory);
+            Environment.SetEnvironmentVariable("WPFDEMO_DATASET_PROFILE", profile);
+            _factory = new TestFactory(_directory, profile);
             Client = _factory.CreateClient();
         }
 
@@ -423,6 +539,7 @@ public sealed class ApiIntegrationTests
             {
                 SqliteConnection.ClearAllPools();
                 Environment.SetEnvironmentVariable("WPFDEMO_SERVER_DATA_DIR", _previousDataDirectory);
+                Environment.SetEnvironmentVariable("WPFDEMO_DATASET_PROFILE", _previousDataProfile);
                 if (_ownsDirectory && Directory.Exists(_directory)) Directory.Delete(_directory, recursive: true);
             }
         }
@@ -431,14 +548,16 @@ public sealed class ApiIntegrationTests
     private sealed class TestFactory : WebApplicationFactory<Program>
     {
         private readonly string _directory;
-        public TestFactory(string directory) { _directory = directory; }
+        private readonly string _profile;
+        public TestFactory(string directory, string profile) { _directory = directory; _profile = profile; }
         protected override void ConfigureWebHost(IWebHostBuilder builder)
         {
             builder.ConfigureAppConfiguration((_, configuration) =>
-                configuration.AddInMemoryCollection(new Dictionary<string, string>
-                {
-                    ["WPFDEMO_SERVER_DATA_DIR"] = _directory
-                }));
+            {
+                var values = new Dictionary<string, string> { ["WPFDEMO_SERVER_DATA_DIR"] = _directory };
+                if (_profile != null) values["WPFDEMO_DATASET_PROFILE"] = _profile;
+                configuration.AddInMemoryCollection(values);
+            });
         }
     }
 }

@@ -29,7 +29,7 @@ jobs:
         shell: pwsh
         run: |
           New-Item -ItemType Directory -Force artifacts | Out-Null
-          msbuild src/WpfDemo.Client/WpfDemo.Client.csproj /p:Configuration=Release /p:Platform=AnyCPU /m 2>&1 | Tee-Object artifacts/wpf-build.log
+          msbuild src/WpfDemo.Client/WpfDemo.Client.csproj -restore /p:Configuration=Release /p:Platform=AnyCPU /m 2>&1 | Tee-Object artifacts/wpf-build.log
           if ($LASTEXITCODE -ne 0) {
             Get-Content artifacts/wpf-build.log | Select-String '(?i)error (CS|MC|MSB|XDG|XAML)[0-9]+' | Select-Object -First 10 | ForEach-Object { Write-Output "::error::$($_.Line)" }
             exit 1
@@ -38,6 +38,39 @@ jobs:
       - name: Publish local API for Windows x64
         run: dotnet publish src/WpfDemo.Api/WpfDemo.Api.csproj -c Release -r win-x64 --self-contained true -o artifacts/api
 
+      - name: Measure paged reads on a deterministic large dataset
+        shell: pwsh
+        run: |
+          $performance = Join-Path $PWD 'artifacts/performance'
+          New-Item -ItemType Directory -Force $performance | Out-Null
+          $env:WPFDEMO_SERVER_DATA_DIR = Join-Path $performance 'server-data'
+          $env:WPFDEMO_DATASET_PROFILE = 'Large'
+          $stdout = Join-Path $performance 'api.stdout.log'
+          $stderr = Join-Path $performance 'api.stderr.log'
+          $apiPath = Join-Path $PWD 'artifacts/api/WpfDemo.Api.exe'
+          $api = Start-Process -FilePath $apiPath -PassThru -WindowStyle Hidden -RedirectStandardOutput $stdout -RedirectStandardError $stderr
+          try {
+            $ready = $false
+            for ($attempt = 0; $attempt -lt 120; $attempt++) {
+              $api.Refresh()
+              if ($api.HasExited) { throw "Large-profile API exited with code $($api.ExitCode)." }
+              try {
+                $equipment = Invoke-RestMethod 'http://127.0.0.1:5187/api/equipment?pageSize=100' -TimeoutSec 3
+                $history = Invoke-RestMethod 'http://127.0.0.1:5187/api/equipment/1001/history?pageSize=100' -TimeoutSec 3
+                if ($equipment.totalCount -eq 10000 -and $history.totalCount -eq 20000) { $ready = $true; break }
+              } catch { }
+              Start-Sleep -Seconds 1
+            }
+            if (-not $ready) { throw 'Large-profile API did not seed 10,000 equipment items and 20,000 history events.' }
+            & pwsh -NoProfile -ExecutionPolicy Bypass -File scripts/Measure-Api.ps1 `
+              -BaseAddress 'http://127.0.0.1:5187' -WarmupRequests 2 -MeasuredRequests 7 `
+              -OutputPath (Join-Path $performance 'large-profile.json')
+            if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          } finally {
+            $api.Refresh()
+            if (-not $api.HasExited) { Stop-Process -Id $api.Id -Force }
+          }
+
       - name: Assemble runnable demo
         shell: pwsh
         run: |
@@ -45,6 +78,7 @@ jobs:
           Copy-Item src/WpfDemo.Client/bin/Release/* artifacts/client/ -Recurse
           New-Item -ItemType Directory -Force artifacts/scripts | Out-Null
           Copy-Item scripts/Start-Demo.ps1 artifacts/scripts/
+          Copy-Item scripts/Measure-Api.ps1 artifacts/scripts/
           Compress-Archive -Path artifacts/api, artifacts/client, artifacts/scripts `
             -DestinationPath artifacts/wpf-demo-windows-demo.zip -Force
 
@@ -52,7 +86,7 @@ jobs:
         shell: pwsh
         run: winget install --id Microsoft.WinAppCLI --version 0.7.0 --silent --accept-package-agreements --accept-source-agreements --disable-interactivity
 
-      - name: Run five API and WPF scenarios
+      - name: Run API and WPF scenarios
         shell: pwsh
         run: ./scripts/Start-Demo.ps1 -Scenario All
 
