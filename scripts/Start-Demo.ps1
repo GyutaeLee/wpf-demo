@@ -641,15 +641,20 @@ function Invoke-LargeList {
         Invoke-WinApp -Arguments @('ui', 'wait-for', 'HistoryPageLabel', '-a', [string]$client.Id,
             '--value', '1 / 400 페이지 · 20,000개', '-t', '15000')
         Save-Screenshot $client (Join-Path $run 'screenshots\03-history-first-page.png')
-        Invoke-Ui -Verb 'click' -Selector 'NextHistoryPage' -ProcessId $client.Id
+        Invoke-Ui -Verb 'invoke' -Selector 'NextHistoryPage' -ProcessId $client.Id
         $expectedHistoryPageRequest = '/api/equipment/1001/history?page=2&pageSize=50 - 200'
         $apiLog = Join-Path $run 'logs\api.stdout.log'
         $historyPageLoaded = $false
         for ($attempt = 0; $attempt -lt 100; $attempt++) {
-            if ([System.IO.File]::ReadAllText($apiLog).Contains($expectedHistoryPageRequest)) {
-                $historyPageLoaded = $true
-                break
+            $logStream = [System.IO.File]::Open($apiLog, [System.IO.FileMode]::Open,
+                [System.IO.FileAccess]::Read, [System.IO.FileShare]::ReadWrite)
+            $logReader = [System.IO.StreamReader]::new($logStream)
+            try {
+                $historyPageLoaded = $logReader.ReadToEnd().Contains($expectedHistoryPageRequest)
+            } finally {
+                $logReader.Dispose()
             }
+            if ($historyPageLoaded) { break }
             Start-Sleep -Milliseconds 100
         }
         if (-not $historyPageLoaded) { throw 'The API did not return history page 2 successfully.' }
