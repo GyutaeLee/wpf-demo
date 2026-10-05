@@ -30,7 +30,7 @@ Mac에서 Actions 실행을 시작하면 GitHub의 Windows 환경이 API와 WPF 
 3. 완료된 실행에서 `wpf-demo-windows` 산출물을 받아 압축을 풉니다.
 4. `runs` 아래 시나리오별 `screenshots`의 PNG와 `videos`의 MP4를 엽니다.
 
-이미 통과한 [실행 결과](https://github.com/GyutaeLee/wpf-demo/actions/runs/37254391635)는 다시 실행하지 않고 내려받아도 됩니다. 새 실행을 시작하려면 저장소 쓰기 권한이 필요합니다. [GitHub의 수동 실행 안내](https://docs.github.com/en/actions/how-tos/manage-workflow-runs/manually-run-a-workflow)를 참고하세요.
+이미 통과한 [최신 실행 결과](https://github.com/GyutaeLee/wpf-demo/actions/runs/37271558473)는 다시 실행하지 않고 내려받아도 됩니다. 새 실행을 시작하려면 저장소 쓰기 권한이 필요합니다. [GitHub의 수동 실행 안내](https://docs.github.com/en/actions/how-tos/manage-workflow-runs/manually-run-a-workflow)를 참고하세요.
 
 ## 자동 시나리오
 
@@ -57,8 +57,8 @@ macOS에서 실행한 테스트는 .NET 10 테스트 프로젝트를 대상으�
 
 | 확인 항목 | 상태 |
 | --- | --- |
-| macOS .NET 테스트 | MSTest 53개 통과 |
-| Windows x64 빌드·테스트·시연 | [Actions 실행](https://github.com/GyutaeLee/wpf-demo/actions/runs/37254391635), 2026-10-05, MSTest 53개와 여섯 시나리오 통과 |
+| macOS .NET 테스트 | MSTest 56개 통과 |
+| Windows x64 빌드·테스트·시연 | [Actions 실행](https://github.com/GyutaeLee/wpf-demo/actions/runs/37271558473), 2026-10-05, MSTest 56개와 여섯 시나리오 통과 · [v0.2.0 다운로드](https://github.com/GyutaeLee/wpf-demo/releases/download/v0.2.0/wpf-demo-windows-demo.zip) |
 | 키보드와 창 크기 | Tab·Enter·Esc, 키보드로 상태 필터 변경, 작은 창과 최대화의 UI 요소 좌표를 자동 검사 |
 | 100%·150% 배율, Narrator, 고대비 | [수동 확인 절차](manual-windows-check.md), 실제 기기에서 확인 전 |
 
@@ -80,16 +80,18 @@ README의 GIF와 아래 GIF는 이 짧은 영상에서 만들었습니다. GitHu
 
 ## 대량 데이터와 진단 파일 검증
 
-macOS에서 `dotnet test tests/WpfDemo.Tests/WpfDemo.Tests.csproj -c Release --no-restore`를 실행해 MSTest 53개가 통과했습니다. 여기에는 API 페이지 처리, 대규모 데이터 생성, 오프라인 캐시, 요청 재시도와 진단 ZIP의 개인정보 제외 검사가 포함됩니다. 대량 데이터의 대여 중 장비 반납, 데이터셋 교체 후 이전 이력의 캐시 저장 거부, 작성이 끝난 ZIP만 노출되는지도 확인합니다. 캐시 사용을 마친 뒤 DB 파일을 독점으로 다시 열 수 있는지도 검사합니다.
+macOS에서 `dotnet test tests/WpfDemo.Tests/WpfDemo.Tests.csproj -c Release --no-restore`를 실행해 MSTest 56개가 통과했습니다. 여기에는 API 페이지 처리, 대규모 데이터 생성, 오프라인 캐시, 요청 재시도와 진단 ZIP의 개인정보 제외 검사가 포함됩니다. 대량 데이터의 대여 중 장비 반납, 데이터셋 교체 후 이전 이력의 캐시 저장 거부, 작성이 끝난 ZIP만 노출되는지도 확인합니다. 캐시 사용을 마친 뒤 DB 파일을 독점으로 다시 열 수 있는지도 검사합니다.
 
-2026-10-05의 [Windows 실행](https://github.com/GyutaeLee/wpf-demo/actions/runs/37254391635)에서는 테스트 53개, WPF 빌드, 여섯 UI 시나리오와 조회 측정이 통과했습니다. 대량 목록 시나리오에서 장비 10,000개와 이력 20,000개를 준비하고 목록·이력의 둘째 페이지를 확인했습니다. 이력의 이전·다음 버튼이 화면 안에 보이는지 검사하고, 다음 버튼을 실제 클릭해 둘째 페이지로 전환되는 것을 확인했습니다.
+초기 대량 목록 검증은 요청 처리 흐름을 분리하기 전의 [Windows 실행](https://github.com/GyutaeLee/wpf-demo/actions/runs/37254391635)에서 진행했습니다. 당시 테스트 53개, WPF 빌드, 여섯 UI 시나리오와 조회 측정이 통과했습니다. 현재 코드는 아래 최신 실행에서 다시 빌드하고 검증했습니다.
+
+최신 [Windows 실행](https://github.com/GyutaeLee/wpf-demo/actions/runs/37271558473)에서는 테스트 56개, WPF 빌드, 여섯 UI 시나리오가 통과했습니다. 대량 목록 시나리오에서 장비 10,000개와 이력 20,000개를 준비하고 목록·이력의 둘째 페이지를 확인했습니다. 이력의 이전·다음 버튼이 화면에 보이는지 검사하고, 다음 버튼을 실제 클릭해 둘째 페이지로 전환되는 것도 확인했습니다.
 
 조회 측정은 Windows x64 러너에서 준비 요청 2회 후 7회 실행했습니다. 장비 목록과 이력은 각각 50건을 반환했고 중앙값은 2.27ms와 18.47ms였습니다. 결과와 환경은 산출물의 `performance/large-profile.json`에 있습니다. 한 러너의 로컬 HTTP 측정이며, UI 응답 시간이나 이전 구현보다 빨라졌다는 근거로 사용하지 않습니다.
 
 `All`은 기본 대여·반납, 두 클라이언트 충돌, 응답 유실, API 중단, 재시작 복구, 대량 목록 등 여섯 흐름을 실행합니다. `Basic` 자동 시연은 진단 ZIP을 클라이언트 데이터 폴더 아래 별도 경로에 저장합니다. 직접 실행할 때 앱은 기본적으로 Windows 문서 폴더에 내보내며, `WPFDEMO_DIAGNOSTICS_OUTPUT_DIR` 환경 변수로 경로를 지정할 수 있습니다. ZIP에는 네 개의 JSON 파일이 있고, 자동 검사는 항목 이름과 시연 메모·출력 경로 제외를 확인합니다.
 
-## 요청 처리 분리 변경의 로컬 확인
+## 요청 처리 변경 확인
 
-2026-10-05에 요청 보관·전송·결과 확인을 `PendingOperationWorkflow`로 옮긴 코드에서 macOS .NET 10 테스트 56개가 통과했습니다. 기존 53개에 응답 유실 후 보관 요청 복구 한 건과, 성공·거부 응답 이후 파일 정리 실패 두 건을 추가했습니다.
+요청 보관·전송·결과 확인을 `PendingOperationWorkflow`로 분리했습니다. 회귀 테스트는 응답 유실 뒤 저장된 요청 복구와, 성공·거부 응답을 받았지만 요청 파일 정리에 실패한 경우를 확인합니다. 두 경우 모두 재시도에서 같은 키와 본문을 사용합니다.
 
-위 Windows 실행 링크와 공개 Release는 변경 전 코드의 확인 결과입니다. 이 변경의 .NET Framework 4.8 WPF 빌드·Windows UI 시연과 배율·Narrator·고대비 수동 확인은 아직 남아 있습니다.
+이 변경은 macOS .NET 10에서 MSTest 56개를 통과했고, [Windows x64 Actions](https://github.com/GyutaeLee/wpf-demo/actions/runs/37271558473)에서도 .NET Framework 4.8 WPF 빌드·테스트·여섯 UI 시나리오를 통과했습니다. 실제 기기의 배율 100%·150%, Narrator, 고대비 확인은 남아 있습니다. 실행 패키지는 [v0.2.0 Release](https://github.com/GyutaeLee/wpf-demo/releases/tag/v0.2.0)에서 받을 수 있습니다.

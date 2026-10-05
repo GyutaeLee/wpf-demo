@@ -37,4 +37,4 @@ WPF 앱을 실행하려면 .NET Framework 4.8 이상이 필요합니다. 자세�
 
 WPF 앱은 .NET Framework 4.8과 XAML, 직접 작성한 MVVM 구조로 만들었습니다. `StatusBadge`는 목록과 상세에서 쓰는 Custom Control입니다. 서버는 ASP.NET Core .NET 10 Minimal API이며 SQLite에 장비와 대여 이력을 저장합니다.
 
-Windows x64에서 MSTest 53개와 여섯 가지 UI 시나리오를 확인했습니다. [Windows 실행 결과](https://github.com/GyutaeLee/wpf-demo/actions/runs/37254391635)와 [설계 시나리오](docs/scenarios.md)를 참고하세요.
+Windows x64에서 MSTest 56개와 여섯 가지 UI 시나리오를 확인했습니다. [Windows 실행 결과](https://github.com/GyutaeLee/wpf-demo/actions/runs/37271558473), [v0.2.0 실행 파일](https://github.com/GyutaeLee/wpf-demo/releases/tag/v0.2.0), [설계 시나리오](docs/scenarios.md)를 참고하세요.
