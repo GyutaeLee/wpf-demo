@@ -2,11 +2,10 @@
 
 ## Windows에서 실행
 
-1. [확인한 Windows Actions 실행](https://github.com/GyutaeLee/wpf-demo/actions/runs/37254391635)을 엽니다.
-2. `wpf-demo-windows` 산출물을 내려받아 압축을 풉니다.
-3. 안에 있는 `wpf-demo-windows-demo.zip`도 풉니다.
-4. 첫 PowerShell 창에서 API를 실행합니다.
-5. 두 번째 PowerShell 창에서 WPF 앱을 실행합니다.
+1. [Windows x64 실행 ZIP](https://github.com/GyutaeLee/wpf-demo/releases/latest/download/wpf-demo-windows-demo.zip)을 내려받아 압축을 풉니다.
+2. 압축을 푼 폴더에서 PowerShell 창을 엽니다. `api`, `client`, `scripts` 폴더가 보여야 합니다.
+3. 첫 PowerShell 창에서 API를 실행합니다.
+4. 같은 폴더에 두 번째 PowerShell 창을 열어 WPF 앱을 실행합니다.
 
 ```powershell
 .\api\WpfDemo.Api.exe
@@ -17,6 +16,10 @@
 ```
 
 API는 `http://127.0.0.1:5187`에서 요청을 받습니다. API는 Windows x64 자체 포함 배포본입니다. WPF 앱을 실행하려면 .NET Framework 4.8 이상이 필요합니다. 실행 파일 사용에는 Visual Studio가 필요하지 않습니다.
+
+배포본은 [Release 목록](https://github.com/GyutaeLee/wpf-demo/releases)에서 확인할 수 있습니다. API와 클라이언트는 같은 ZIP의 파일을 함께 사용합니다. 소스를 수정한 경우 공개 Release에는 그 변경이 아직 포함되지 않을 수 있으므로 태그와 검증 실행을 확인합니다.
+
+배율·키보드·Narrator·고대비를 직접 확인하려면 [Windows 수동 확인 절차](manual-windows-check.md)를 따릅니다. 결과 기록 양식도 같은 문서에 있습니다.
 
 ## Mac에서 화면 확인
 
@@ -57,7 +60,7 @@ macOS에서 실행한 테스트는 .NET 10 테스트 프로젝트를 대상으�
 | macOS .NET 테스트 | MSTest 53개 통과 |
 | Windows x64 빌드·테스트·시연 | [Actions 실행](https://github.com/GyutaeLee/wpf-demo/actions/runs/37254391635), 2026-10-05, MSTest 53개와 여섯 시나리오 통과 |
 | 키보드와 창 크기 | Tab·Enter·Esc, 키보드로 상태 필터 변경, 작은 창과 최대화의 UI 요소 좌표를 자동 검사 |
-| 100%·150% 배율, Narrator, 고대비 | Windows에서 직접 확인 전 |
+| 100%·150% 배율, Narrator, 고대비 | [수동 확인 절차](manual-windows-check.md), 실제 기기에서 확인 전 |
 
 연결된 Actions 실행에는 .NET Framework 4.8 WPF 빌드와 여섯 시나리오 실행이 들어 있습니다. 통과한 실행의 산출물에는 그 실행에서 만든 캡처·영상과 실행 파일이 함께 올라갑니다. 작은 창 검사는 모든 문구와 실제 디스플레이 배율에서의 가독성까지 확인하지 않습니다.
 
@@ -84,3 +87,9 @@ macOS에서 `dotnet test tests/WpfDemo.Tests/WpfDemo.Tests.csproj -c Release --n
 조회 측정은 Windows x64 러너에서 준비 요청 2회 후 7회 실행했습니다. 장비 목록과 이력은 각각 50건을 반환했고 중앙값은 2.27ms와 18.47ms였습니다. 결과와 환경은 산출물의 `performance/large-profile.json`에 있습니다. 한 러너의 로컬 HTTP 측정이며, UI 응답 시간이나 이전 구현보다 빨라졌다는 근거로 사용하지 않습니다.
 
 `All`은 기본 대여·반납, 두 클라이언트 충돌, 응답 유실, API 중단, 재시작 복구, 대량 목록 등 여섯 흐름을 실행합니다. `Basic` 자동 시연은 진단 ZIP을 클라이언트 데이터 폴더 아래 별도 경로에 저장합니다. 직접 실행할 때 앱은 기본적으로 Windows 문서 폴더에 내보내며, `WPFDEMO_DIAGNOSTICS_OUTPUT_DIR` 환경 변수로 경로를 지정할 수 있습니다. ZIP에는 네 개의 JSON 파일이 있고, 자동 검사는 항목 이름과 시연 메모·출력 경로 제외를 확인합니다.
+
+## 요청 처리 분리 변경의 로컬 확인
+
+2026-10-05에 요청 보관·전송·결과 확인을 `PendingOperationWorkflow`로 옮긴 코드에서 macOS .NET 10 테스트 56개가 통과했습니다. 기존 53개에 응답 유실 후 보관 요청 복구 한 건과, 성공·거부 응답 이후 파일 정리 실패 두 건을 추가했습니다.
+
+위 Windows 실행 링크와 공개 Release는 변경 전 코드의 확인 결과입니다. 이 변경의 .NET Framework 4.8 WPF 빌드·Windows UI 시연과 배율·Narrator·고대비 수동 확인은 아직 남아 있습니다.
