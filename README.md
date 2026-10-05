@@ -17,7 +17,7 @@
 
 ## Windows에서 실행
 
-[Windows x64 실행 파일 다운로드](https://github.com/GyutaeLee/wpf-demo/releases/latest/download/wpf-demo-windows-demo.zip) 후 압축을 풉니다. PowerShell 창 하나에서 API를 실행하고, 새 창에서 WPF 앱을 실행합니다.
+[최신 Windows x64 Release](https://github.com/GyutaeLee/wpf-demo/releases/latest)를 열어 설명을 확인한 뒤 `wpf-demo-windows-demo.zip`을 내려받아 압축을 풉니다. PowerShell 창 하나에서 API를 실행하고, 새 창에서 WPF 앱을 실행합니다.
 
 API:
 
@@ -37,4 +37,4 @@ WPF 앱을 실행하려면 .NET Framework 4.8 이상이 필요합니다. 자세�
 
 WPF 앱은 .NET Framework 4.8과 XAML, 직접 작성한 MVVM 구조로 만들었습니다. `StatusBadge`는 목록과 상세에서 쓰는 Custom Control입니다. 서버는 ASP.NET Core .NET 10 Minimal API이며 SQLite에 장비와 대여 이력을 저장합니다.
 
-Windows x64에서 MSTest 56개와 여섯 가지 UI 시나리오를 확인했습니다. [Windows 실행 결과](https://github.com/GyutaeLee/wpf-demo/actions/runs/37271558473), [v0.2.0 실행 파일](https://github.com/GyutaeLee/wpf-demo/releases/tag/v0.2.0), [설계 시나리오](docs/scenarios.md)를 참고하세요.
+Windows x64에서 MSTest 56개와 여섯 가지 UI 시나리오를 확인했습니다. [Windows 실행 결과](https://github.com/GyutaeLee/wpf-demo/actions/runs/37271558473), [최신 Release와 변경 내용](https://github.com/GyutaeLee/wpf-demo/releases/latest), [설계 시나리오](docs/scenarios.md)를 참고하세요.

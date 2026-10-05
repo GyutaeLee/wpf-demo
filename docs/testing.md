@@ -2,7 +2,7 @@
 
 ## Windows에서 실행
 
-1. [Windows x64 실행 ZIP](https://github.com/GyutaeLee/wpf-demo/releases/latest/download/wpf-demo-windows-demo.zip)을 내려받아 압축을 풉니다.
+1. [최신 Windows x64 Release](https://github.com/GyutaeLee/wpf-demo/releases/latest)를 열어 설명을 확인하고, 첨부된 `wpf-demo-windows-demo.zip`을 내려받아 압축을 풉니다.
 2. 압축을 푼 폴더에서 PowerShell 창을 엽니다. `api`, `client`, `scripts` 폴더가 보여야 합니다.
 3. 첫 PowerShell 창에서 API를 실행합니다.
 4. 같은 폴더에 두 번째 PowerShell 창을 열어 WPF 앱을 실행합니다.
@@ -58,7 +58,7 @@ macOS에서 실행한 테스트는 .NET 10 테스트 프로젝트를 대상으�
 | 확인 항목 | 상태 |
 | --- | --- |
 | macOS .NET 테스트 | MSTest 56개 통과 |
-| Windows x64 빌드·테스트·시연 | [Actions 실행](https://github.com/GyutaeLee/wpf-demo/actions/runs/37271558473), 2026-10-05, MSTest 56개와 여섯 시나리오 통과 · [v0.2.0 다운로드](https://github.com/GyutaeLee/wpf-demo/releases/download/v0.2.0/wpf-demo-windows-demo.zip) |
+| Windows x64 빌드·테스트·시연 | [Actions 실행](https://github.com/GyutaeLee/wpf-demo/actions/runs/37271558473), 2026-10-05, MSTest 56개와 여섯 시나리오 통과 · [최신 Release와 변경 내용](https://github.com/GyutaeLee/wpf-demo/releases/latest) |
 | 키보드와 창 크기 | Tab·Enter·Esc, 키보드로 상태 필터 변경, 작은 창과 최대화의 UI 요소 좌표를 자동 검사 |
 | 100%·150% 배율, Narrator, 고대비 | [수동 확인 절차](manual-windows-check.md), 실제 기기에서 확인 전 |
 
@@ -94,4 +94,4 @@ macOS에서 `dotnet test tests/WpfDemo.Tests/WpfDemo.Tests.csproj -c Release --n
 
 요청 보관·전송·결과 확인을 `PendingOperationWorkflow`로 분리했습니다. 회귀 테스트는 응답 유실 뒤 저장된 요청 복구와, 성공·거부 응답을 받았지만 요청 파일 정리에 실패한 경우를 확인합니다. 두 경우 모두 재시도에서 같은 키와 본문을 사용합니다.
 
-이 변경은 macOS .NET 10에서 MSTest 56개를 통과했고, [Windows x64 Actions](https://github.com/GyutaeLee/wpf-demo/actions/runs/37271558473)에서도 .NET Framework 4.8 WPF 빌드·테스트·여섯 UI 시나리오를 통과했습니다. 실제 기기의 배율 100%·150%, Narrator, 고대비 확인은 남아 있습니다. 실행 패키지는 [v0.2.0 Release](https://github.com/GyutaeLee/wpf-demo/releases/tag/v0.2.0)에서 받을 수 있습니다.
+이 변경은 macOS .NET 10에서 MSTest 56개를 통과했고, [Windows x64 Actions](https://github.com/GyutaeLee/wpf-demo/actions/runs/37271558473)에서도 .NET Framework 4.8 WPF 빌드·테스트·여섯 UI 시나리오를 통과했습니다. 실제 기기의 배율 100%·150%, Narrator, 고대비 확인은 남아 있습니다. 실행 파일과 변경 설명은 [최신 Release](https://github.com/GyutaeLee/wpf-demo/releases/latest)에서 확인할 수 있습니다.

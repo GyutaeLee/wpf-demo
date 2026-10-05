@@ -4,7 +4,7 @@
 
 ## 실행 준비
 
-1. [Windows x64 실행 ZIP](https://github.com/GyutaeLee/wpf-demo/releases/latest/download/wpf-demo-windows-demo.zip)을 내려받아 압축을 풉니다.
+1. [최신 Windows x64 Release](https://github.com/GyutaeLee/wpf-demo/releases/latest)를 열어 설명을 확인하고, 첨부된 `wpf-demo-windows-demo.zip`을 내려받아 압축을 풉니다.
 2. Release 태그, Windows 버전, 화면 해상도와 배율을 아래 양식에 적습니다. 수정한 소스를 빌드했다면 커밋 ID나 변경 파일도 적습니다.
 3. ZIP을 푼 폴더에서 PowerShell 창 두 개를 엽니다. 두 창 모두 같은 폴더에 있어야 합니다.
 
