@@ -2,7 +2,7 @@
 
 ## Windows에서 실행
 
-1. [확인한 Windows Actions 실행](https://github.com/GyutaeLee/wpf-demo/actions/runs/37253113506)을 엽니다.
+1. [확인한 Windows Actions 실행](https://github.com/GyutaeLee/wpf-demo/actions/runs/37254391635)을 엽니다.
 2. `wpf-demo-windows` 산출물을 내려받아 압축을 풉니다.
 3. 안에 있는 `wpf-demo-windows-demo.zip`도 풉니다.
 4. 첫 PowerShell 창에서 API를 실행합니다.
@@ -27,7 +27,7 @@ Mac에서 Actions 실행을 시작하면 GitHub의 Windows 환경이 API와 WPF 
 3. 완료된 실행에서 `wpf-demo-windows` 산출물을 받아 압축을 풉니다.
 4. `runs` 아래 시나리오별 `screenshots`의 PNG와 `videos`의 MP4를 엽니다.
 
-이미 통과한 [실행 결과](https://github.com/GyutaeLee/wpf-demo/actions/runs/37253113506)는 다시 실행하지 않고 내려받아도 됩니다. 새 실행을 시작하려면 저장소 쓰기 권한이 필요합니다. [GitHub의 수동 실행 안내](https://docs.github.com/en/actions/how-tos/manage-workflow-runs/manually-run-a-workflow)를 참고하세요.
+이미 통과한 [실행 결과](https://github.com/GyutaeLee/wpf-demo/actions/runs/37254391635)는 다시 실행하지 않고 내려받아도 됩니다. 새 실행을 시작하려면 저장소 쓰기 권한이 필요합니다. [GitHub의 수동 실행 안내](https://docs.github.com/en/actions/how-tos/manage-workflow-runs/manually-run-a-workflow)를 참고하세요.
 
 ## 자동 시나리오
 
@@ -55,7 +55,7 @@ macOS에서 실행한 테스트는 .NET 10 테스트 프로젝트를 대상으�
 | 확인 항목 | 상태 |
 | --- | --- |
 | macOS .NET 테스트 | MSTest 53개 통과 |
-| Windows x64 빌드·테스트·시연 | [Actions 실행](https://github.com/GyutaeLee/wpf-demo/actions/runs/37253113506), 2026-10-05, MSTest 53개와 여섯 시나리오 통과 |
+| Windows x64 빌드·테스트·시연 | [Actions 실행](https://github.com/GyutaeLee/wpf-demo/actions/runs/37254391635), 2026-10-05, MSTest 53개와 여섯 시나리오 통과 |
 | 키보드와 창 크기 | Tab·Enter·Esc, 키보드로 상태 필터 변경, 작은 창과 최대화의 UI 요소 좌표를 자동 검사 |
 | 100%·150% 배율, Narrator, 고대비 | Windows에서 직접 확인 전 |
 
@@ -79,8 +79,8 @@ README의 GIF와 아래 GIF는 이 짧은 영상에서 만들었습니다. GitHu
 
 macOS에서 `dotnet test tests/WpfDemo.Tests/WpfDemo.Tests.csproj -c Release --no-restore`를 실행해 MSTest 53개가 통과했습니다. 여기에는 API 페이지 처리, 대규모 데이터 생성, 오프라인 캐시, 요청 재시도와 진단 ZIP의 개인정보 제외 검사가 포함됩니다. 대량 데이터의 대여 중 장비 반납, 데이터셋 교체 후 이전 이력의 캐시 저장 거부, 작성이 끝난 ZIP만 노출되는지도 확인합니다. 캐시 사용을 마친 뒤 DB 파일을 독점으로 다시 열 수 있는지도 검사합니다.
 
-2026-10-05의 [Windows 실행](https://github.com/GyutaeLee/wpf-demo/actions/runs/37253113506)에서는 테스트 53개, WPF 빌드, 여섯 UI 시나리오와 조회 측정이 통과했습니다. 대량 목록 시나리오에서 장비 10,000개와 이력 20,000개를 준비하고 목록·이력의 둘째 페이지를 확인했습니다. 이 실행의 이력 페이지 전환은 UI Automation 명령으로 검사했습니다. 화면에 보이는 버튼의 실제 클릭 검사는 다음 실행에서 확인할 항목입니다.
+2026-10-05의 [Windows 실행](https://github.com/GyutaeLee/wpf-demo/actions/runs/37254391635)에서는 테스트 53개, WPF 빌드, 여섯 UI 시나리오와 조회 측정이 통과했습니다. 대량 목록 시나리오에서 장비 10,000개와 이력 20,000개를 준비하고 목록·이력의 둘째 페이지를 확인했습니다. 이력의 이전·다음 버튼이 화면 안에 보이는지 검사하고, 다음 버튼을 실제 클릭해 둘째 페이지로 전환되는 것을 확인했습니다.
 
-조회 측정은 Windows x64 러너에서 준비 요청 2회 후 7회 실행했습니다. 장비 목록과 이력은 각각 50건을 반환했고 중앙값은 1.76ms와 23.60ms였습니다. 결과와 환경은 산출물의 `performance/large-profile.json`에 있습니다. 한 러너의 로컬 HTTP 측정이며, UI 응답 시간이나 이전 구현보다 빨라졌다는 근거로 사용하지 않습니다.
+조회 측정은 Windows x64 러너에서 준비 요청 2회 후 7회 실행했습니다. 장비 목록과 이력은 각각 50건을 반환했고 중앙값은 2.27ms와 18.47ms였습니다. 결과와 환경은 산출물의 `performance/large-profile.json`에 있습니다. 한 러너의 로컬 HTTP 측정이며, UI 응답 시간이나 이전 구현보다 빨라졌다는 근거로 사용하지 않습니다.
 
 `All`은 기본 대여·반납, 두 클라이언트 충돌, 응답 유실, API 중단, 재시작 복구, 대량 목록 등 여섯 흐름을 실행합니다. `Basic` 자동 시연은 진단 ZIP을 클라이언트 데이터 폴더 아래 별도 경로에 저장합니다. 직접 실행할 때 앱은 기본적으로 Windows 문서 폴더에 내보내며, `WPFDEMO_DIAGNOSTICS_OUTPUT_DIR` 환경 변수로 경로를 지정할 수 있습니다. ZIP에는 네 개의 JSON 파일이 있고, 자동 검사는 항목 이름과 시연 메모·출력 경로 제외를 확인합니다.

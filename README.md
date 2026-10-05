@@ -14,7 +14,7 @@ Windows에서 실제 앱을 녹화했습니다. 아래 GIF는 대여·반납 영
 
 ## Windows에서 실행
 
-[확인한 Windows Actions 실행](https://github.com/GyutaeLee/wpf-demo/actions/runs/37253113506)에서 `wpf-demo-windows` 산출물을 받습니다. 압축을 풀고 안의 `wpf-demo-windows-demo.zip`도 풉니다.
+[확인한 Windows Actions 실행](https://github.com/GyutaeLee/wpf-demo/actions/runs/37254391635)에서 `wpf-demo-windows` 산출물을 받습니다. 압축을 풀고 안의 `wpf-demo-windows-demo.zip`도 풉니다.
 
 1. `api\WpfDemo.Api.exe`를 실행합니다.
 2. 다른 터미널에서 `client\WpfDemo.exe`를 실행합니다.
