@@ -13,6 +13,7 @@
 - 장비 검색, 상태 필터, 대여·반납, 장비별 이력 조회
 - 다른 사용자가 먼저 대여한 경우 충돌을 알리고 최신 정보를 다시 조회
 - 저장 요청의 응답이 끊기면 같은 요청으로 재시도하고, 앱을 다시 열어도 보관한 요청 복구
+- API 연결이 끊겼을 때 이전 조회 결과 표시, 진단 ZIP에서 요청 본문·메모·검색어 제외
 - 장비 10,000개와 이력 20,000건을 페이지 단위로 조회
 
 ## Windows에서 실행
@@ -37,4 +38,6 @@ WPF 앱을 실행하려면 .NET Framework 4.8 이상이 필요합니다. 자세�
 
 WPF 앱은 .NET Framework 4.8과 XAML, 직접 작성한 MVVM 구조로 만들었습니다. `StatusBadge`는 목록과 상세에서 쓰는 Custom Control입니다. 서버는 ASP.NET Core .NET 10 Minimal API이며 SQLite에 장비와 대여 이력을 저장합니다.
 
-Windows x64에서 MSTest 56개와 여섯 가지 UI 시나리오를 확인했습니다. [Windows 실행 결과](https://github.com/GyutaeLee/wpf-demo/actions/runs/37271558473), [최신 Release와 변경 내용](https://github.com/GyutaeLee/wpf-demo/releases/latest), [설계 시나리오](docs/scenarios.md)를 참고하세요.
+확인한 Windows 실행에서는 .NET Framework 4.8 빌드, MSTest 56개와 여섯 UI 시나리오가 통과했습니다. 현재 워크플로는 Actions에서 직접 실행해야 합니다. [Windows 실행 기록](https://github.com/GyutaeLee/wpf-demo/actions/runs/37271558473)과 [Release](https://github.com/GyutaeLee/wpf-demo/releases/latest)를 볼 수 있습니다.
+
+설계와 범위는 [시나리오 문서](docs/scenarios.md), 실행 절차와 검증 범위는 [테스트 안내](docs/testing.md)에 정리했습니다. 실제 Windows에서 확인할 항목은 [수동 확인 목록](docs/manual-windows-check.md)을 참고하세요.
