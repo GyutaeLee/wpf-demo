@@ -13,7 +13,7 @@ namespace WpfDemo
     public sealed class LendingViewModel : INotifyPropertyChanged
     {
         private readonly ILendingApi _api;
-        private readonly IPendingOperationStore _pendingStore;
+        private readonly PendingOperationWorkflow _operations;
         private readonly IReadCacheStore _readCache;
         private readonly IClientRequestLog _requestLog;
         private readonly Func<double> _dpiProvider;
@@ -29,7 +29,6 @@ namespace WpfDemo
         private string _initialNote = "";
         private string _initialBorrowerId = "";
         private IReadOnlyList<LoanHistoryEntry> _history = new LoanHistoryEntry[0];
-        private PendingOperation _pending;
         private bool _isLoading;
         private bool _isLoadingHistory;
         private bool _isSending;
@@ -63,7 +62,7 @@ namespace WpfDemo
             IClientRequestLog requestLog = null, Func<double> dpiProvider = null, string diagnosticsOutputDirectory = null)
         {
             _api = api ?? throw new ArgumentNullException(nameof(api));
-            _pendingStore = pendingStore ?? throw new ArgumentNullException(nameof(pendingStore));
+            _operations = new PendingOperationWorkflow(_api, pendingStore);
             _readCache = readCache;
             _requestLog = requestLog;
             _dpiProvider = dpiProvider;
@@ -82,8 +81,8 @@ namespace WpfDemo
             NextHistoryPageCommand = new AsyncRelayCommand(() => LoadHistoryAsync(SelectedItem?.Id ?? 0, HistoryPage + 1), () => CanNextHistoryPage);
             BorrowCommand = new AsyncRelayCommand(BorrowAsync, () => CanBorrow);
             ReturnCommand = new AsyncRelayCommand(ReturnAsync, () => CanReturn);
-            RetryCommand = new AsyncRelayCommand(RetryPendingAsync, () => _pending != null && !IsSending);
-            CancelCommand = new RelayCommand(CancelDraft, () => IsDirty && _pending == null && !IsSending);
+            RetryCommand = new AsyncRelayCommand(RetryPendingAsync, () => _operations.Pending != null && !IsSending);
+            CancelCommand = new RelayCommand(CancelDraft, () => IsDirty && _operations.Pending == null && !IsSending);
             ExportDiagnosticsCommand = new AsyncRelayCommand(ExportDiagnosticsAsync, () => _requestLog != null && !IsExportingDiagnostics);
         }
 
@@ -214,13 +213,13 @@ namespace WpfDemo
         public bool HasUnknownResult { get { return _hasUnknownResult; } private set { Set(ref _hasUnknownResult, value); } }
         public bool HasRecoveryError { get { return _hasRecoveryError; } private set { Set(ref _hasRecoveryError, value); } }
         public bool HasConfirmedError { get { return _hasConfirmedError; } private set { Set(ref _hasConfirmedError, value); } }
-        public bool HasPendingOperation { get { return _pending != null; } }
-        public bool CanNavigate { get { return !IsLoading && !IsSending && _pending == null && !IsDirty && !HasRecoveryError; } }
-        public bool CanEdit { get { return HasSelection && !IsLoading && !IsSending && _pending == null && !IsOffline && !HasRecoveryError; } }
+        public bool HasPendingOperation { get { return _operations.Pending != null; } }
+        public bool CanNavigate { get { return !IsLoading && !IsSending && _operations.Pending == null && !IsDirty && !HasRecoveryError; } }
+        public bool CanEdit { get { return HasSelection && !IsLoading && !IsSending && _operations.Pending == null && !IsOffline && !HasRecoveryError; } }
         public bool CanChooseBorrower { get { return CanEdit && SelectedItem.Status == EquipmentStates.Available; } }
         public bool CanBorrow { get { return CanEdit && SelectedItem.Status == EquipmentStates.Available && SelectedBorrower != null && IsValidNote; } }
         public bool CanReturn { get { return CanEdit && SelectedItem.Status == EquipmentStates.OnLoan && SelectedItem.ActiveLoan != null && IsValidNote; } }
-        public bool CanRetry { get { return _pending != null && !IsSending; } }
+        public bool CanRetry { get { return _operations.Pending != null && !IsSending; } }
         public bool IsEmpty { get { return !IsLoading && VisibleItems.Count == 0 && (!HasLoadError || IsShowingCachedData); } }
         public int EquipmentTotalCount { get { return _equipmentTotalCount; } }
         public int EquipmentPage { get { return _equipmentPage; } }
@@ -251,11 +250,11 @@ namespace WpfDemo
         private const int PageSize = 50;
         private int EquipmentPageCount { get { return Math.Max(1, (int)Math.Ceiling((double)_equipmentTotalCount / PageSize)); } }
         private int HistoryPageCount { get { return Math.Max(1, (int)Math.Ceiling((double)_historyTotalCount / PageSize)); } }
-        public bool CanChangeQuery { get { return !IsSending && _pending == null && !IsDirty && !HasRecoveryError; } }
+        public bool CanChangeQuery { get { return !IsSending && _operations.Pending == null && !IsDirty && !HasRecoveryError; } }
 
         public async Task InitializeAsync()
         {
-            try { _pending = _pendingStore.Current; }
+            try { _operations.Restore(); }
             catch (Exception)
             {
                 HasRecoveryError = true;
@@ -263,12 +262,12 @@ namespace WpfDemo
             }
             OnPropertyChanged(nameof(HasPendingOperation));
             UpdateState();
-            if (_pending != null)
+            if (_operations.Pending != null)
             {
                 HasUnknownResult = true;
                 OperationMessage = "이전 요청의 결과를 확인하는 중입니다.";
                 await SendPendingAsync();
-                if (_pending == null) return;
+                if (_operations.Pending == null) return;
             }
             await RefreshAsync(preserveDraft: true);
         }
@@ -283,7 +282,7 @@ namespace WpfDemo
                 DiagnosticsResponse server = null;
                 try { server = await _api.GetDiagnosticsAsync(CancellationToken.None); }
                 catch (Exception) { }
-                var current = _pending;
+                var current = _operations.Pending;
                 var clientEvents = _requestLog.GetRecent();
                 var dpi = _dpiProvider == null ? 96.0 : _dpiProvider();
                 var outputPath = await Task.Run(() => DiagnosticBundleExporter.Export(
@@ -312,7 +311,7 @@ namespace WpfDemo
 
         private async Task RefreshEquipmentPageAsync(bool preserveDraft, int page, bool allowCacheOnly = true)
         {
-            if (IsSending || (_pending != null && !preserveDraft)) return;
+            if (IsSending || (_operations.Pending != null && !preserveDraft)) return;
             _equipmentReadCancellation?.Cancel();
             var cancellation = new CancellationTokenSource();
             _equipmentReadCancellation = cancellation;
@@ -681,7 +680,7 @@ namespace WpfDemo
 
         private async Task StartOperationAsync(string kind)
         {
-            if (IsLoading || IsSending || _pending != null || IsOffline || HasRecoveryError || SelectedItem == null || !IsValidNote) return;
+            if (IsLoading || IsSending || _operations.Pending != null || IsOffline || HasRecoveryError || SelectedItem == null || !IsValidNote) return;
             if (kind == "Borrow" && (SelectedItem.Status != EquipmentStates.Available || SelectedBorrower == null)) return;
             if (kind == "Return" && (SelectedItem.Status != EquipmentStates.OnLoan || SelectedItem.ActiveLoan == null)) return;
             PendingOperation operation;
@@ -694,7 +693,7 @@ namespace WpfDemo
                     ? PendingOperationStore.CreateBorrow(_apiAddress, DatasetId, SelectedItem.Id,
                         SelectedItem.Version, SelectedBorrower.Id, DraftNote.Trim())
                     : PendingOperationStore.CreateReturn(_apiAddress, DatasetId, SelectedItem, DraftNote.Trim());
-                await Task.Run(() => _pendingStore.Save(operation));
+                await _operations.PersistAsync(operation);
             }
             catch (Exception)
             {
@@ -704,7 +703,6 @@ namespace WpfDemo
                 UpdateState();
                 return;
             }
-            _pending = operation;
             OnPropertyChanged(nameof(HasPendingOperation));
             HasConfirmedError = false;
             await SendPendingAsync();
@@ -712,57 +710,49 @@ namespace WpfDemo
 
         public async Task RetryPendingAsync()
         {
-            if (_pending == null || IsSending) return;
+            if (_operations.Pending == null || IsSending) return;
             await SendPendingAsync();
         }
 
         private async Task SendPendingAsync()
         {
-            var operation = _pending;
+            var operation = _operations.Pending;
             if (operation == null) return;
             IsSending = true;
             HasUnknownResult = false;
             OperationMessage = "요청 결과를 확인하는 중입니다.";
             UpdateState();
-            LoanOperationResponse response = null;
-            try
+            var attempt = await _operations.SendAsync();
+            IsSending = false;
+            OnPropertyChanged(nameof(HasPendingOperation));
+            if (!attempt.IsConfirmed)
             {
-                response = await _api.SendOperationAsync(operation);
-                if (response == null || response.OperationId != operation.OperationId || !response.Success ||
-                    response.Code != (operation.Kind == "Borrow" ? "Borrowed" : "Returned"))
-                    throw new InvalidOperationException("서버 응답을 요청 결과로 확인할 수 없습니다.");
-            }
-            catch (ApiResponseException ex) when (ex.IsConfirmed)
-            {
-                await FinishDefiniteFailureAsync(operation, ex);
-                return;
-            }
-            catch (Exception)
-            {
-                IsSending = false;
                 IsOffline = true;
                 HasUnknownResult = true;
                 OperationMessage = "요청 결과를 확인하지 못했습니다. 같은 요청으로 다시 시도할 수 있습니다.";
                 UpdateState();
                 return;
             }
-
-            try
+            if (attempt.CleanupFailed)
             {
-                await Task.Run(() => _pendingStore.Delete(operation.OperationId));
-                _pending = null;
-                OnPropertyChanged(nameof(HasPendingOperation));
-            }
-            catch (Exception)
-            {
-                IsSending = false;
                 HasUnknownResult = true;
-                OperationMessage = "서버 처리 결과는 받았지만 요청 기록을 정리하지 못했습니다. 같은 요청으로 다시 확인해 주세요.";
+                OperationMessage = attempt.Rejection == null
+                    ? "서버 처리 결과는 받았지만 요청 기록을 정리하지 못했습니다. 같은 요청으로 다시 확인해 주세요."
+                    : "요청은 거부되었지만 요청 기록을 정리하지 못했습니다. 같은 요청으로 다시 확인해 주세요.";
+                UpdateState();
+                return;
+            }
+            if (attempt.Rejection != null)
+            {
+                HasUnknownResult = false;
+                HasConfirmedError = true;
+                IsOffline = false;
+                OperationMessage = attempt.Rejection.Message;
+                await RefreshAsync(preserveDraft: true);
                 UpdateState();
                 return;
             }
 
-            IsSending = false;
             HasUnknownResult = false;
             HasConfirmedError = false;
             _draftNote = "";
@@ -776,35 +766,9 @@ namespace WpfDemo
             UpdateState();
         }
 
-        private async Task FinishDefiniteFailureAsync(PendingOperation operation, ApiResponseException exception)
-        {
-            try
-            {
-                await Task.Run(() => _pendingStore.Delete(operation.OperationId));
-                _pending = null;
-                OnPropertyChanged(nameof(HasPendingOperation));
-            }
-            catch (Exception)
-            {
-                IsSending = false;
-                HasUnknownResult = true;
-                OperationMessage = "요청은 거부되었지만 요청 기록을 정리하지 못했습니다. 같은 요청으로 다시 확인해 주세요.";
-                UpdateState();
-                return;
-            }
-
-            IsSending = false;
-            HasUnknownResult = false;
-            HasConfirmedError = true;
-            IsOffline = false;
-            OperationMessage = exception.Message;
-            await RefreshAsync(preserveDraft: true);
-            UpdateState();
-        }
-
         private void CancelDraft()
         {
-            if (!IsDirty || _pending != null || IsSending) return;
+            if (!IsDirty || _operations.Pending != null || IsSending) return;
             _draftNote = _initialNote;
             _selectedBorrower = Borrowers.FirstOrDefault(x => x.Id == _initialBorrowerId);
             OnPropertyChanged(nameof(DraftNote));
@@ -861,20 +825,5 @@ namespace WpfDemo
         {
             PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(name));
         }
-    }
-
-    public sealed class ApiResponseException : Exception
-    {
-        public ApiResponseException(int statusCode, string code, string message, bool isConfirmed)
-            : base(message)
-        {
-            StatusCode = statusCode;
-            Code = code;
-            IsConfirmed = isConfirmed;
-        }
-
-        public int StatusCode { get; private set; }
-        public string Code { get; private set; }
-        public bool IsConfirmed { get; private set; }
     }
 }

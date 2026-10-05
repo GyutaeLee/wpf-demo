@@ -81,6 +81,7 @@
     <Compile Include="..\Shared\LendingContracts.cs"><Link>Shared\LendingContracts.cs</Link></Compile>
     <Compile Include="..\Shared\LendingViewModel.cs"><Link>Shared\LendingViewModel.cs</Link></Compile>
     <Compile Include="..\Shared\PendingOperation.cs"><Link>Shared\PendingOperation.cs</Link></Compile>
+    <Compile Include="..\Shared\PendingOperationWorkflow.cs"><Link>Shared\PendingOperationWorkflow.cs</Link></Compile>
     <Compile Include="..\Shared\RelayCommand.cs"><Link>Shared\RelayCommand.cs</Link></Compile>
   </ItemGroup>
   <ItemGroup>

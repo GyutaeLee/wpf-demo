@@ -10,6 +10,7 @@
     <Compile Include="../../src/Shared/ILendingApi.cs" Link="Shared/ILendingApi.cs" />
     <Compile Include="../../src/Shared/LendingViewModel.cs" Link="Shared/LendingViewModel.cs" />
     <Compile Include="../../src/Shared/PendingOperation.cs" Link="Shared/PendingOperation.cs" />
+    <Compile Include="../../src/Shared/PendingOperationWorkflow.cs" Link="Shared/PendingOperationWorkflow.cs" />
     <Compile Include="../../src/Shared/RelayCommand.cs" Link="Shared/RelayCommand.cs" />
     <Compile Include="../../src/WpfDemo.Client/PendingOperationStore.cs" Link="Client/PendingOperationStore.cs" />
     <Compile Include="../../src/WpfDemo.Client/ReadCacheStore.cs" Link="Client/ReadCacheStore.cs" />

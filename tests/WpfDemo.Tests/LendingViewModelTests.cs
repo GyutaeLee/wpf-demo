@@ -510,6 +510,75 @@ public sealed class LendingViewModelTests
         finally { Directory.Delete(directory, recursive: true); }
     }
 
+    [TestMethod]
+    public async Task WorkflowKeepsRequestIdentityAfterResponseLossAndClearsItOnlyAfterConfirmation()
+    {
+        using var rig = new TestRig();
+        var workflow = new PendingOperationWorkflow(rig.Api, rig.Store);
+        workflow.Restore();
+        Assert.AreEqual(PendingOperationState.Ready, workflow.State);
+        var operation = PendingOperationStore.CreateBorrow("http://127.0.0.1:5187", rig.Api.DatasetId,
+            1001, 1, "A", "same request after interruption");
+        await workflow.PersistAsync(operation);
+        rig.Api.FailAfterCommitNext = new HttpRequestException("response lost after commit");
+
+        var first = await workflow.SendAsync();
+        Assert.IsFalse(first.IsConfirmed);
+        Assert.AreEqual(PendingOperationState.Unconfirmed, workflow.State);
+        Assert.AreEqual(operation.OperationId, rig.Store.Current.OperationId);
+
+        // Recreate the workflow to include the persisted-request recovery boundary.
+        var restored = new PendingOperationWorkflow(rig.Api, rig.Store);
+        restored.Restore();
+        Assert.AreEqual(PendingOperationState.Unconfirmed, restored.State);
+        Assert.AreEqual(operation.BodyJson, restored.Pending.BodyJson);
+        var second = await restored.SendAsync();
+        Assert.IsTrue(second.IsConfirmed);
+        Assert.IsFalse(second.CleanupFailed);
+        Assert.AreEqual(PendingOperationState.ConfirmedSuccess, restored.State);
+        Assert.IsNull(restored.Pending);
+        Assert.IsNull(rig.Store.Current);
+        Assert.AreEqual(1, (await rig.Api.GetHistoryAsync(1001)).Count);
+        Assert.AreEqual(2, rig.Api.SentOperations.Count);
+        Assert.IsTrue(rig.Api.SentOperations.All(x => x.OperationId == operation.OperationId && x.BodyJson == operation.BodyJson));
+    }
+
+    [DataTestMethod]
+    [DataRow(false)]
+    [DataRow(true)]
+    public async Task ReceiptCleanupFailureKeepsRequestLockedUntilSameRequestCanBeCleared(bool rejected)
+    {
+        using var rig = new TestRig();
+        using var store = new BlockingStore(rig.Store) { DeleteFailure = new IOException("cannot remove request") };
+        store.Release.Set();
+        var vm = new LendingViewModel(rig.Api, store, "http://127.0.0.1:5187", "A");
+        await vm.InitializeAsync();
+        vm.SelectedItem = vm.VisibleItems.Single(x => x.Id == 1001);
+        vm.DraftNote = "keep until confirmed";
+        if (rejected)
+            rig.Api.BeforeSend = _ => Task.FromException(new ApiResponseException(409, "VersionConflict", "changed", true));
+
+        await vm.BorrowAsync();
+        var pending = rig.Store.Current;
+        Assert.IsNotNull(pending);
+        Assert.IsTrue(vm.HasUnknownResult);
+        Assert.IsTrue(vm.CanRetry);
+        Assert.IsFalse(vm.CanEdit);
+        Assert.IsFalse(vm.CanNavigate);
+        StringAssert.Contains(vm.OperationMessage, "기록을 정리하지 못했습니다");
+
+        store.DeleteFailure = null;
+        await vm.RetryPendingAsync();
+        Assert.IsNull(rig.Store.Current);
+        Assert.IsFalse(vm.HasPendingOperation);
+        Assert.IsFalse(vm.HasUnknownResult);
+        Assert.AreEqual(rejected, vm.HasConfirmedError);
+        Assert.AreEqual(rejected ? "keep until confirmed" : "", vm.DraftNote);
+        Assert.AreEqual(rejected ? 0 : 1, (await rig.Api.GetHistoryAsync(1001)).Count);
+        Assert.AreEqual(2, rig.Api.SentOperations.Count);
+        Assert.IsTrue(rig.Api.SentOperations.All(x => x.OperationId == pending.OperationId && x.BodyJson == pending.BodyJson));
+    }
+
     private static string Write<T>(T value)
     {
         using var stream = new MemoryStream();
@@ -565,6 +634,7 @@ public sealed class LendingViewModelTests
         public ManualResetEventSlim Release { get; } = new(false);
         public int SaveCount { get; private set; }
         public Exception SaveFailure { get; set; }
+        public Exception DeleteFailure { get; set; }
         public PendingOperation Current => _inner.Current;
 
         public BlockingStore(IPendingOperationStore inner) { _inner = inner; }
@@ -578,7 +648,11 @@ public sealed class LendingViewModelTests
             _inner.Save(operation);
         }
 
-        public void Delete(string operationId) => _inner.Delete(operationId);
+        public void Delete(string operationId)
+        {
+            if (DeleteFailure != null) throw DeleteFailure;
+            _inner.Delete(operationId);
+        }
         public void Dispose() { Entered.Dispose(); Release.Dispose(); }
     }
 

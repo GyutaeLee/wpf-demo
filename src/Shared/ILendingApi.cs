@@ -51,4 +51,19 @@ namespace WpfDemo
         void Record(ClientDiagnosticEvent item);
         IReadOnlyList<ClientDiagnosticEvent> GetRecent();
     }
+
+    public sealed class ApiResponseException : System.Exception
+    {
+        public ApiResponseException(int statusCode, string code, string message, bool isConfirmed)
+            : base(message)
+        {
+            StatusCode = statusCode;
+            Code = code;
+            IsConfirmed = isConfirmed;
+        }
+
+        public int StatusCode { get; private set; }
+        public string Code { get; private set; }
+        public bool IsConfirmed { get; private set; }
+    }
 }
