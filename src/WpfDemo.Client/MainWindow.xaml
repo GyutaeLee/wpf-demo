@@ -274,6 +274,12 @@
                                                AutomationProperties.AutomationId="HistoryLoadingIndicator" />
                                 </StackPanel>
                             </Grid>
+                            <StackPanel Orientation="Horizontal" HorizontalAlignment="Left" Margin="0,0,0,8">
+                                <Button Content="이전 이력" Command="{Binding PreviousHistoryPageCommand}"
+                                        AutomationProperties.AutomationId="PreviousHistoryPage" />
+                                <Button Content="다음 이력" Command="{Binding NextHistoryPageCommand}" Margin="8,0,0,0"
+                                        AutomationProperties.AutomationId="NextHistoryPage" />
+                            </StackPanel>
                             <TextBlock Text="{Binding HistoryCacheNotice}" Foreground="{DynamicResource {x:Static SystemColors.InfoTextBrushKey}}"
                                        TextWrapping="Wrap" Margin="0,0,0,8">
                                 <TextBlock.Style><Style TargetType="TextBlock"><Setter Property="Visibility" Value="Collapsed" />
@@ -325,12 +331,6 @@
                                     </DataTemplate>
                                 </ItemsControl.ItemTemplate>
                             </ItemsControl>
-                            <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" Margin="0,4,0,0">
-                                <Button Content="이전 이력" Command="{Binding PreviousHistoryPageCommand}"
-                                        AutomationProperties.AutomationId="PreviousHistoryPage" />
-                                <Button Content="다음 이력" Command="{Binding NextHistoryPageCommand}" Margin="8,0,0,0"
-                                        AutomationProperties.AutomationId="NextHistoryPage" />
-                            </StackPanel>
                         </StackPanel>
                     </ScrollViewer>
 
